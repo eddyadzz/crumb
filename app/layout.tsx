@@ -1,7 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
-import { AppShell } from '@/components/app-shell';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,7 +37,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${display.variable} font-sans no-tap-highlight`}
       >
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   );

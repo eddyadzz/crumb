@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IngredientMovementType {
+  PURCHASE
+  PRODUCTION
+  ADJUSTMENT
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RecipeStatus {
+  ACTIVE
+  DRAFT
+}
+
+enum ProductType {
+  WHOLE
+  PORTION
+}
+
+enum ProductMovementType {
+  PRODUCED
+  SOLD
+  GIFTED
+  SPOILED
+  SAMPLE
+  STAFF
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TierKey {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+model Tenant {
+  id                 String             @id @default(cuid())
+  name               String
+  slug               String             @unique
+  email              String?
+  phone              String?
+  country            String?
+  status             TenantStatus       @default(ACTIVE)
+  subscriptionTier   TierKey            @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  users              User[]
+  subscriptions      Subscription[]
+  ingredients        Ingredient[]
+  recipes            Recipe[]
+  products           Product[]
+  productionOrders   ProductionOrder[]
+  sales              Sale[]
+
+  @@index([subscriptionTier])
+  @@index([status])
+}
+
+model SubscriptionTier {
+  id            String         @id @default(cuid())
+  key           TierKey        @unique
+  name          String
+  priceMonthly  Float
+  priceYearly   Float
+  features      String[]
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tierId    String
+  tier      SubscriptionTier   @relation(fields: [tierId], references: [id])
+  status    SubscriptionStatus @default(TRIAL)
+  startsAt  DateTime           @default(now())
+  endsAt    DateTime?
+  autoRenew Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([tenantId])
+  @@index([tierId])
+  @@index([status])
+}
+
+model Ingredient {
+  id                String               @id @default(cuid())
+  tenantId          String
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  baseUnit          String
+  purchaseQuantity  Float
+  purchaseUnit      String
+  purchaseCost      Float
+  availableQuantity Float
+  reorderLevel      Float
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  movements         IngredientMovement[]
+  recipeIngredients RecipeIngredient[]
+
+  @@index([tenantId])
+}
+
+model IngredientMovement {
+  id           String                 @id @default(cuid())
+  ingredientId String
+  ingredient   Ingredient             @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  type         IngredientMovementType
+  quantity     Float
+  notes        String?
+  createdAt    DateTime               @default(now())
+
+  @@index([ingredientId])
+  @@index([createdAt])
+}
+
+model Recipe {
+  id                String             @id @default(cuid())
+  tenantId          String
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  instructions      String
+  preparationTime   Int
+  servingsProduced  Int
+  status            RecipeStatus       @default(ACTIVE)
+  packagingCost     Float              @default(0)
+  utilityCost       Float              @default(0)
+  laborCost         Float              @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  recipeIngredients RecipeIngredient[]
+  products          Product[]
+  productionItems   ProductionItem[]
+
+  @@index([tenantId])
+}
+
+model RecipeIngredient {
+  id           String     @id @default(cuid())
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  quantity     Float
+  unit         String
+
+  @@index([recipeId])
+  @@index([ingredientId])
+}
+
+model ProductionOrder {
+  id          String           @id @default(cuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  status      ProductionStatus @default(PLANNED)
+  createdAt   DateTime         @default(now())
+  completedAt DateTime?
+  items       ProductionItem[]
+
+  @@index([tenantId])
+  @@index([createdAt])
+}
+
+model ProductionItem {
+  id                String          @id @default(cuid())
+  productionOrderId String
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  recipeId          String
+  recipe            Recipe          @relation(fields: [recipeId], references: [id])
+  batchCount        Int
+
+  @@index([productionOrderId])
+}
+
+model Product {
+  id                String            @id @default(cuid())
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipeId          String
+  recipe            Recipe            @relation(fields: [recipeId], references: [id])
+  name              String
+  sellingPrice      Float
+  availableQuantity Int
+  type              ProductType
+  movements         ProductMovement[]
+  saleItems         SaleItem[]
+
+  @@index([tenantId])
+  @@index([recipeId])
+}
+
+model ProductMovement {
+  id        String              @id @default(cuid())
+  productId String
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      ProductMovementType
+  quantity  Int
+  createdAt DateTime            @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model Sale {
+  id          String     @id @default(cuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  totalAmount Float
+  createdAt   DateTime   @default(now())
+  items       SaleItem[]
+
+  @@index([tenantId])
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+
+  @@index([saleId])
+}
+
+// --- Better Auth models ---
+
+model User {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  role          UserRole  @default(STAFF)
+  isOwner       Boolean   @default(false)
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@index([tenantId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

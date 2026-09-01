@@ -12,6 +12,8 @@ import {
   Carrot,
   MoreHorizontal,
   Settings,
+  Wrench,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,14 +31,49 @@ const moreNav = [
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const allNav = [...mainNav, ...moreNav];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export type AccountSummary = {
+  tenantName: string;
+  plan: string;
+  subscriptionStatus: string;
+  trialEndsAt: string | null;
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  FREE: 'Free',
+  PRO: 'Pro',
+  BUSINESS: 'Business',
+};
+
+function trialDaysLeft(trialEndsAt: string | null): number | null {
+  if (!trialEndsAt) return null;
+  const ms = new Date(trialEndsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+}
+
+export function AppShell({
+  children,
+  account,
+}: {
+  children: React.ReactNode;
+  account: AccountSummary;
+}) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  const onTrial = account.subscriptionStatus === 'TRIAL';
+  const daysLeft = onTrial ? trialDaysLeft(account.trialEndsAt) : null;
+  const planLabel = PLAN_LABEL[account.plan] ?? account.plan;
+  const planLine = onTrial
+    ? daysLeft !== null && daysLeft > 0
+      ? `${planLabel} Plan · trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+      : `${planLabel} Plan · trial ended`
+    : `${planLabel} Plan`;
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -80,10 +117,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-border p-4">
           <div className="rounded-xl bg-accent/50 p-3">
             <p className="text-xs font-semibold text-accent-foreground">
-              Free Plan
+              {planLine}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              MVP — all features unlocked
+              {account.tenantName}
             </p>
           </div>
         </div>
@@ -146,6 +183,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
         </header>
+
+        {/* Trial notice */}
+        {onTrial && daysLeft !== null && daysLeft > 0 && (
+          <div className="flex items-center justify-center gap-2 border-b border-amber-200/70 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-800">
+            <Sparkles className="h-3.5 w-3.5" />
+            Free trial — {daysLeft} day{daysLeft === 1 ? '' : 's'} left
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>

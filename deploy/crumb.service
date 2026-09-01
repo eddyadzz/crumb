@@ -1,0 +1,24 @@
+[Unit]
+Description=Crumb web application (Next.js standalone)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+# Create a dedicated user: sudo useradd -r -m -d /opt/crumb crumb
+User=crumb
+Group=crumb
+WorkingDirectory=/opt/crumb
+# Load DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL from /opt/crumb/.env
+EnvironmentFile=/opt/crumb/.env
+Environment=NODE_ENV=production
+Environment=HOSTNAME=0.0.0.0
+Environment=PORT=3000
+# Apply pending migrations before starting, then launch the standalone server
+ExecStartPre=/usr/bin/env npx prisma migrate deploy
+ExecStart=/usr/bin/env node /opt/crumb/.next/standalone/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
