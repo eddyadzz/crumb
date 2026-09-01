@@ -95,6 +95,7 @@ export interface AccountInfo {
   slug: string;
   subscriptionTier: string;
   subscriptionStatus: string;
+  trialEndsAt: string | null;
 }
 
 export async function getAccountInfo(): Promise<AccountInfo> {
@@ -109,5 +110,6 @@ export async function getAccountInfo(): Promise<AccountInfo> {
     slug: ctx.tenant.slug,
     subscriptionTier: ctx.tenant.subscriptionTier,
     subscriptionStatus: ctx.tenant.subscriptionStatus,
+    trialEndsAt: ctx.tenant.trialEndsAt?.toISOString() ?? null,
   };
 }

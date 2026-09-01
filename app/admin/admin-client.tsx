@@ -7,6 +7,7 @@ import {
   Users,
   CreditCard,
   Activity,
+  Clock,
   Loader2,
   Shield,
 } from 'lucide-react';
@@ -96,10 +97,11 @@ export function AdminClient({
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <StatCard label="Total Tenants" value={String(stats.totalTenants)} icon={<Building2 className="h-5 w-5" />} variant="primary" />
         <StatCard label="Active" value={String(stats.activeTenants)} icon={<Activity className="h-5 w-5" />} variant="success" />
         <StatCard label="Trials" value={String(stats.trialTenants)} icon={<CreditCard className="h-5 w-5" />} />
+        <StatCard label="Expired Trials" value={String(stats.expiredTrials)} icon={<Clock className="h-5 w-5" />} variant="warning" />
         <StatCard label="MRR" value={formatMVR(stats.mrr)} icon={<Users className="h-5 w-5" />} />
       </div>
 

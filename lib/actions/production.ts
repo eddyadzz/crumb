@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenantWritable } from '@/lib/tenant';
 import { convertToBase } from '@/lib/costing';
 
 export interface CreateProductionOrderInput {
@@ -10,7 +10,7 @@ export interface CreateProductionOrderInput {
 }
 
 export async function createProductionOrder(input: CreateProductionOrderInput) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
 
   const recipeIds = [...new Set(input.items.map((i) => i.recipeId))];
   const owned = await prisma.recipe.findMany({
@@ -41,7 +41,7 @@ export async function createProductionOrder(input: CreateProductionOrderInput) {
 }
 
 export async function startProductionOrder(orderId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   await prisma.productionOrder.update({
     where: { id: orderId, tenantId },
     data: { status: 'IN_PROGRESS' },
@@ -51,7 +51,7 @@ export async function startProductionOrder(orderId: string) {
 }
 
 export async function completeProductionOrder(orderId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const order = await prisma.productionOrder.findUnique({
     where: { id: orderId, tenantId },
     include: {
@@ -115,7 +115,7 @@ export async function completeProductionOrder(orderId: string) {
 }
 
 export async function cancelProductionOrder(orderId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   await prisma.productionOrder.update({
     where: { id: orderId, tenantId },
     data: { status: 'CANCELLED' },

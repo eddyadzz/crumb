@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 
 export async function getMovementsForIngredient(ingredientId: string) {
   const { tenantId } = await requireTenant();
@@ -23,7 +23,7 @@ export interface CreateIngredientInput {
 }
 
 export async function createIngredient(input: CreateIngredientInput) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const ingredient = await prisma.ingredient.create({
     data: {
       tenantId,
@@ -60,7 +60,7 @@ export interface AdjustStockInput {
 }
 
 export async function adjustStock(input: AdjustStockInput) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const ingredient = await prisma.ingredient.findUnique({
     where: { id: input.ingredientId, tenantId },
   });

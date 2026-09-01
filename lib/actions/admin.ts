@@ -7,11 +7,14 @@ import { requirePlatformAdmin } from '@/lib/admin';
 export async function adminGetDashboard() {
   await requirePlatformAdmin();
 
-  const [totalTenants, activeTenants, trialTenants, tierCounts, activeSubs] =
+  const [totalTenants, activeTenants, trialTenants, expiredTrials, tierCounts, activeSubs] =
     await Promise.all([
       prisma.tenant.count(),
       prisma.tenant.count({ where: { status: 'ACTIVE' } }),
       prisma.tenant.count({ where: { subscriptionStatus: 'TRIAL' } }),
+      prisma.tenant.count({
+        where: { subscriptionStatus: 'TRIAL', trialEndsAt: { lt: new Date() } },
+      }),
       prisma.tenant.groupBy({ by: ['subscriptionTier'], _count: { _all: true } }),
       prisma.subscription.findMany({
         where: { status: 'ACTIVE' },
@@ -27,6 +30,7 @@ export async function adminGetDashboard() {
     totalTenants,
     activeTenants,
     trialTenants,
+    expiredTrials,
     suspendedTenants: totalTenants - activeTenants,
     tierCount,
     mrr,

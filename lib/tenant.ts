@@ -12,6 +12,7 @@ export type TenantContext = {
   role: string;
   isOwner: boolean;
   tenantId: string;
+  trialExpired: boolean;
   tenant: {
     id: string;
     name: string;
@@ -22,6 +23,17 @@ export type TenantContext = {
     trialEndsAt: Date | null;
   };
 };
+
+/** True once a TRIAL subscription passes its end date (lazy, never writes). */
+export function isTrialExpired(
+  tenant: Pick<TenantContext['tenant'], 'subscriptionStatus' | 'trialEndsAt'>
+): boolean {
+  return (
+    tenant.subscriptionStatus === 'TRIAL' &&
+    tenant.trialEndsAt !== null &&
+    tenant.trialEndsAt.getTime() <= Date.now()
+  );
+}
 
 async function resolveTenantContext(): Promise<TenantContext | null> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -51,6 +63,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
     role: user.role ?? 'STAFF',
     isOwner: user.isOwner ?? false,
     tenantId: tenant.id,
+    trialExpired: isTrialExpired(tenant),
     tenant: { ...tenant, status: tenant.status, subscriptionTier: tenant.subscriptionTier, subscriptionStatus: tenant.subscriptionStatus },
   };
 }
@@ -78,6 +91,17 @@ export const getTenantContextOrNull = cache(async (): Promise<TenantContext | nu
 export async function requireTenant(): Promise<TenantContext> {
   const ctx = await resolveTenantContext();
   if (!ctx) throw new Error('Unauthorized');
+  return ctx;
+}
+
+/**
+ * Like requireTenant, but also rejects mutations once the tenant's trial has
+ * expired — reads stay available, writes are blocked until the subscription
+ * is reactivated.
+ */
+export async function requireTenantWritable(): Promise<TenantContext> {
+  const ctx = await requireTenant();
+  if (ctx.trialExpired) throw new Error('Trial expired');
   return ctx;
 }
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenantWritable } from '@/lib/tenant';
 
 export interface CreateProductInput {
   recipeId: string;
@@ -12,7 +12,7 @@ export interface CreateProductInput {
 }
 
 export async function createProduct(input: CreateProductInput) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const recipe = await prisma.recipe.findFirst({
     where: { id: input.recipeId, tenantId },
     select: { id: true },
@@ -35,7 +35,7 @@ export async function createProduct(input: CreateProductInput) {
 }
 
 export async function deleteProduct(productId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const p = await prisma.product.findUnique({
     where: { id: productId, tenantId },
   });
@@ -51,7 +51,7 @@ export async function bulkLogProductMovement(input: {
   type: 'PRODUCED' | 'GIFTED' | 'SPOILED' | 'SAMPLE' | 'STAFF';
   quantity: number;
 }) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const product = await prisma.product.findUnique({
     where: { id: input.productId, tenantId },
   });

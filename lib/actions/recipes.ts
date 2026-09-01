@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenantWritable } from '@/lib/tenant';
 
 export interface CreateRecipeInput {
   name: string;
@@ -16,7 +16,7 @@ export interface CreateRecipeInput {
 }
 
 export async function createRecipe(input: CreateRecipeInput) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const recipe = await prisma.recipe.create({
     data: {
       tenantId,
@@ -41,7 +41,7 @@ export async function addRecipeIngredient(input: {
   quantity: number;
   unit: string;
 }) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const recipe = await prisma.recipe.findFirst({
     where: { id: input.recipeId, tenantId },
     select: { id: true },
@@ -66,7 +66,7 @@ export async function addRecipeIngredient(input: {
 }
 
 export async function removeRecipeIngredient(recipeIngredientId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const ri = await prisma.recipeIngredient.findFirst({
     where: { id: recipeIngredientId, recipe: { tenantId } },
   });
@@ -83,7 +83,7 @@ export async function updateRecipeCosts(input: {
   utilityCost: number;
   laborCost: number;
 }) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   await prisma.recipe.update({
     where: { id: input.recipeId, tenantId },
     data: {

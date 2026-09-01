@@ -63,6 +63,21 @@ export default function SettingsPage() {
               </Badge>
             )}
           </div>
+          {account?.subscriptionStatus === 'TRIAL' && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Trial</p>
+                  <p className="text-xs text-muted-foreground">
+                    {account.trialEndsAt
+                      ? `Ends ${new Date(account.trialEndsAt).toLocaleDateString()}`
+                      : 'No end date set'}
+                  </p>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
           <Separator />
           <div className="flex items-center justify-between">
             <div>

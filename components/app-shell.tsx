@@ -68,11 +68,12 @@ export function AppShell({
 
   const onTrial = account.subscriptionStatus === 'TRIAL';
   const daysLeft = onTrial ? trialDaysLeft(account.trialEndsAt) : null;
+  const trialExpired = onTrial && daysLeft !== null && daysLeft === 0;
   const planLabel = PLAN_LABEL[account.plan] ?? account.plan;
   const planLine = onTrial
-    ? daysLeft !== null && daysLeft > 0
-      ? `${planLabel} Plan · trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
-      : `${planLabel} Plan · trial ended`
+    ? trialExpired
+      ? `${planLabel} Plan · trial ended`
+      : `${planLabel} Plan · trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
     : `${planLabel} Plan`;
 
   const isActive = (href: string) =>
@@ -189,6 +190,13 @@ export function AppShell({
           <div className="flex items-center justify-center gap-2 border-b border-amber-200/70 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-800">
             <Sparkles className="h-3.5 w-3.5" />
             Free trial — {daysLeft} day{daysLeft === 1 ? '' : 's'} left
+          </div>
+        )}
+        {trialExpired && (
+          <div className="flex items-center justify-center gap-2 border-b border-orange-300/70 bg-orange-50 px-4 py-1.5 text-xs font-medium text-orange-800">
+            <Sparkles className="h-3.5 w-3.5" />
+            Your free trial has ended — editing is paused. Contact BoliFlow to
+            reactivate.
           </div>
         )}
 

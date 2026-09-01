@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenantWritable } from '@/lib/tenant';
 
 export interface SaleLineItem {
   productId: string;
@@ -11,7 +11,7 @@ export interface SaleLineItem {
 }
 
 export async function processSale(input: { items: SaleLineItem[] }) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantWritable();
   const valid = input.items.filter((i) => i.quantity > 0);
   if (valid.length === 0) return null;
 
