@@ -41,7 +41,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatMVR } from '@/lib/costing';
-import { FEATURE_KEYS, resolvePlanFeatures } from '@/lib/plans';
+import { FEATURE_KEYS, FEATURE_LABELS, resolvePlanFeatures } from '@/lib/plans';
 import {
   adminSetTenantStatus,
   adminCreateTenant,
@@ -399,7 +399,7 @@ export function AdminClient({
                             <div className="flex max-w-md flex-wrap gap-1">
                               {featureNames.map((f) => (
                                 <Badge key={f} variant="outline" className="text-[11px]">
-                                  {f}
+                                  {FEATURE_LABELS[f]}
                                 </Badge>
                               ))}
                             </div>

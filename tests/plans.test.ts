@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canAccess,
+  FEATURE_LABELS,
   hasPlanFeature,
   isFreePlanCode,
   planDisplayName,
@@ -26,7 +27,9 @@ describe('resolvePlanFeatures', () => {
   it('grants pro its named features only', () => {
     const f = resolvePlanFeatures(pro);
     expect(f.analytics).toBe(true);
-    expect(f.customerManagement).toBe(true);
+    expect(f.productCatalog).toBe(true);
+    expect(f.orders).toBe(true);
+    expect(f.expenseTracking).toBe(true);
     expect(f.multiUser).toBe(false);
   });
 
@@ -36,6 +39,7 @@ describe('resolvePlanFeatures', () => {
     expect(f.suppliers).toBe(true);
     expect(f.activityLogs).toBe(true);
     expect(f.analytics).toBe(true);
+    expect(f.orders).toBe(true);
   });
 
   it('lets DB feature overrides win over the built-in defaults', () => {
@@ -115,5 +119,13 @@ describe('isFreePlanCode / planDisplayName', () => {
     expect(planDisplayName({ code: 'business', name: 'Business' })).toBe('Business');
     expect(planDisplayName({ code: 'pro' })).toBe('Pro');
     expect(planDisplayName(null)).toBe('Free');
+  });
+});
+
+describe('feature matrix', () => {
+  it('labels every feature key (for settings/admin chips)', () => {
+    for (const key of Object.keys(FEATURE_LABELS)) {
+      expect(FEATURE_LABELS[key as keyof typeof FEATURE_LABELS].length).toBeGreaterThan(0);
+    }
   });
 });

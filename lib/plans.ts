@@ -10,14 +10,28 @@
 export const FEATURE_KEYS = [
   'multiUser',
   'customerManagement',
+  'orders',
+  'productCatalog',
+  'expenseTracking',
   'analytics',
-  'recipeScaling',
-  'exports',
   'suppliers',
   'activityLogs',
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+/** Human-readable labels for the feature matrix (settings + admin UIs). */
+export const FEATURE_LABELS: Record<FeatureKey, string> = {
+  multiUser: 'Multi User',
+  customerManagement: 'Customer Database',
+  orders: 'Orders',
+  productCatalog: 'Product Catalog',
+  expenseTracking: 'Expense Tracking',
+  analytics: 'Profit Reports',
+  suppliers: 'Supplier Directory',
+  activityLogs: 'Activity Logs',
+};
+
 export type PlanFeatures = Partial<Record<FeatureKey, boolean>>;
 
 /** Defaults per built-in plan code. Any plan row can override via `features`. */
@@ -25,16 +39,18 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
   free: {},
   pro: {
     customerManagement: true,
+    orders: true,
+    productCatalog: true,
+    expenseTracking: true,
     analytics: true,
-    recipeScaling: true,
-    exports: true,
   },
   business: {
     multiUser: true,
     customerManagement: true,
+    orders: true,
+    productCatalog: true,
+    expenseTracking: true,
     analytics: true,
-    recipeScaling: true,
-    exports: true,
     suppliers: true,
     activityLogs: true,
   },

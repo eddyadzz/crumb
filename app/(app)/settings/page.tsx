@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
 import { getAccountInfo, listPlans } from '@/lib/actions/tenant';
 import type { AccountInfo, PlanInfo } from '@/lib/actions/tenant';
-import { FEATURE_KEYS } from '@/lib/plans';
+import { FEATURE_KEYS, FEATURE_LABELS } from '@/lib/plans';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                             className="inline-flex items-center gap-1 rounded-full bg-primary/5 px-2 py-0.5 text-[11px] font-medium text-primary"
                           >
                             <Check className="h-3 w-3" />
-                            {f}
+                            {FEATURE_LABELS[f]}
                           </span>
                         ))}
                       </div>

@@ -1,11 +1,6 @@
 import { getSalesData, getProductOutcomeSummary, getProductProfitability } from '@/lib/queries';
 import { getTenantContext } from '@/lib/tenant';
-import { canAccess } from '@/lib/plans';
-import { Lock } from 'lucide-react';
-import Link from 'next/link';
 import { ReportsClient } from './reports-client';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,38 +18,7 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 export default async function ReportsPage() {
-  const ctx = await getTenantContext();
-  const sub = ctx.tenant.subscription;
-  const canViewReports = canAccess(ctx.tenant.plan, 'analytics', {
-    status: sub?.status ?? null,
-    trialEndsAt: sub?.trialEndsAt ?? null,
-  });
-
-  if (!canViewReports) {
-    return (
-      <div className="mx-auto max-w-lg p-8">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-              <Lock className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">Reports are a Pro feature</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Unlock sales analytics, product profitability and waste insights on
-                the Pro or Business plan.
-              </p>
-            </div>
-            <Link href="/settings">
-              <Button>View plans</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const { tenantId } = ctx;
+  const { tenantId } = await getTenantContext();
   const [sales, outcomeSummary, profitability] = await Promise.all([
     getSalesData(tenantId),
     getProductOutcomeSummary(tenantId),
