@@ -5,6 +5,12 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isTrialExpired } from '@/lib/trial';
+import {
+  canAccess,
+  resolvePlanFeatures,
+  type FeatureKey,
+  type PlanFeatures,
+} from '@/lib/plans';
 
 export type TenantContext = {
   userId: string;
@@ -19,9 +25,16 @@ export type TenantContext = {
     name: string;
     slug: string;
     status: string;
-    subscriptionTier: string;
-    subscriptionStatus: string;
-    trialEndsAt: Date | null;
+    plan: {
+      code: string;
+      name: string;
+      features: PlanFeatures;
+    } | null;
+    subscription: {
+      status: string;
+      billingInterval: string;
+      trialEndsAt: Date | null;
+    } | null;
   };
 };
 
@@ -38,13 +51,25 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
           name: true,
           slug: true,
           status: true,
-          subscriptionTier: true,
-          subscriptionStatus: true,
-          trialEndsAt: true,
+          subscription: {
+            select: {
+              status: true,
+              billingInterval: true,
+              trialEndsAt: true,
+              plan: { select: { code: true, name: true, features: true } },
+            },
+          },
         },
       })
     : null;
   if (!tenant || tenant.status === 'SUSPENDED') return null;
+
+  const subscription = tenant.subscription;
+  const plan = subscription?.plan ?? null;
+  const trialExpired = isTrialExpired(
+    subscription?.status ?? 'CANCELLED',
+    subscription?.trialEndsAt ?? null
+  );
 
   return {
     userId: user.id,
@@ -53,8 +78,17 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
     role: user.role ?? 'STAFF',
     isOwner: user.isOwner ?? false,
     tenantId: tenant.id,
-    trialExpired: isTrialExpired(tenant.subscriptionStatus, tenant.trialEndsAt),
-    tenant: { ...tenant, status: tenant.status, subscriptionTier: tenant.subscriptionTier, subscriptionStatus: tenant.subscriptionStatus },
+    trialExpired,
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+      plan: plan
+        ? { code: plan.code, name: plan.name, features: resolvePlanFeatures(plan) }
+        : null,
+      subscription,
+    },
   };
 }
 
@@ -92,6 +126,26 @@ export async function requireTenant(): Promise<TenantContext> {
 export async function requireTenantWritable(): Promise<TenantContext> {
   const ctx = await requireTenant();
   if (ctx.trialExpired) throw new Error('Trial expired');
+  return ctx;
+}
+
+/**
+ * Gate a feature on the tenant's current plan + subscription state.
+ * Throws when the feature is not available (trial-expired and non-active
+ * subscriptions are treated as locked). Use with requireTenantWritable for
+ * mutation actions so trials also stay blocked once expired.
+ */
+export async function requireFeature(feature: FeatureKey): Promise<TenantContext> {
+  const ctx = await requireTenant();
+  const sub = ctx.tenant.subscription;
+  if (
+    !canAccess(ctx.tenant.plan, feature, {
+      status: sub?.status ?? null,
+      trialEndsAt: sub?.trialEndsAt ?? null,
+    })
+  ) {
+    throw new Error(`Feature "${feature}" is not included in your plan`);
+  }
   return ctx;
 }
 

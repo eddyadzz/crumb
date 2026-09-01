@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { PLAN_FEATURES } from '../lib/plans';
 
 const prisma = new PrismaClient();
 
@@ -19,44 +20,51 @@ async function main() {
   await prisma.ingredientMovement.deleteMany();
   await prisma.ingredient.deleteMany();
   await prisma.subscription.deleteMany();
-  await prisma.subscriptionTier.deleteMany();
+  await prisma.plan.deleteMany();
   await prisma.tenant.deleteMany();
 
   // Auth tables (sessions/accounts cascade from user delete)
   await prisma.verification.deleteMany();
   await prisma.user.deleteMany();
 
-  // --- Subscription tiers ---
-  const tiers = [
+  // --- Plans ---
+  const plans = [
     {
-      key: 'FREE' as const,
+      code: 'free',
       name: 'Free',
-      priceMonthly: 0,
-      priceYearly: 0,
-      features: ['1 business', '1 user', 'Unlimited recipes & ingredients', 'Unlimited sales & production'],
+      description: 'Start baking solo',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      sortOrder: 0,
+      active: true,
+      features: PLAN_FEATURES.free,
     },
     {
-      key: 'PRO' as const,
+      code: 'pro',
       name: 'Pro',
-      priceMonthly: 199,
-      priceYearly: 1990,
-      features: ['Everything in Free', 'Customer management', 'Product catalog', 'Expense tracking', 'Recipe scaling', 'Exports'],
+      description: 'For serious home bakers',
+      monthlyPrice: 249,
+      yearlyPrice: 2490,
+      sortOrder: 1,
+      active: true,
+      features: PLAN_FEATURES.pro,
     },
     {
-      key: 'BUSINESS' as const,
+      code: 'business',
       name: 'Business',
-      priceMonthly: 499,
-      priceYearly: 4990,
-      features: ['Everything in Pro', 'Multiple users & team roles', 'Activity logs', 'Supplier directory', 'Advanced reporting'],
+      description: 'Grow with your team',
+      monthlyPrice: 799,
+      yearlyPrice: 7990,
+      sortOrder: 2,
+      active: true,
+      features: PLAN_FEATURES.business,
     },
   ];
-  await prisma.subscriptionTier.createMany({ data: tiers });
+  await prisma.plan.createMany({ data: plans });
 
   // --- Demo tenant ---
   const trialEnd = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
-  const freeTier = await prisma.subscriptionTier.findUniqueOrThrow({
-    where: { key: 'FREE' },
-  });
+  const freePlan = await prisma.plan.findUniqueOrThrow({ where: { code: 'free' } });
   const tenant = await prisma.tenant.create({
     data: {
       name: 'Sweet Crumbs Bakery',
@@ -65,18 +73,17 @@ async function main() {
       phone: '+960 777 0000',
       country: 'MV',
       status: 'ACTIVE',
-      subscriptionTier: 'FREE',
-      subscriptionStatus: 'TRIAL',
-      trialEndsAt: trialEnd,
     },
   });
   await prisma.subscription.create({
     data: {
       tenantId: tenant.id,
-      tierId: freeTier.id,
+      planId: freePlan.id,
       status: 'TRIAL',
+      billingInterval: 'MONTHLY',
       startsAt: new Date(),
       endsAt: trialEnd,
+      trialEndsAt: trialEnd,
       autoRenew: true,
     },
   });
