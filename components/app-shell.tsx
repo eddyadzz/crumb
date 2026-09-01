@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trialDaysLeft } from '@/lib/trial';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
@@ -49,12 +50,6 @@ const PLAN_LABEL: Record<string, string> = {
   PRO: 'Pro',
   BUSINESS: 'Business',
 };
-
-function trialDaysLeft(trialEndsAt: string | null): number | null {
-  if (!trialEndsAt) return null;
-  const ms = new Date(trialEndsAt).getTime() - Date.now();
-  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
-}
 
 export function AppShell({
   children,

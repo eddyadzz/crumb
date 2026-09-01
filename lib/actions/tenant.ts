@@ -5,17 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { requireTenant } from '@/lib/tenant';
+import { slugify } from '@/lib/slug';
 
 const TRIAL_DAYS = 14;
-
-function slugify(input: string): string {
-  const base = input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return base || 'business';
-}
 
 async function uniqueSlug(businessName: string): Promise<string> {
   const base = slugify(businessName);

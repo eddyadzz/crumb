@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isTrialExpired } from '@/lib/trial';
 
 export type TenantContext = {
   userId: string;
@@ -23,17 +24,6 @@ export type TenantContext = {
     trialEndsAt: Date | null;
   };
 };
-
-/** True once a TRIAL subscription passes its end date (lazy, never writes). */
-export function isTrialExpired(
-  tenant: Pick<TenantContext['tenant'], 'subscriptionStatus' | 'trialEndsAt'>
-): boolean {
-  return (
-    tenant.subscriptionStatus === 'TRIAL' &&
-    tenant.trialEndsAt !== null &&
-    tenant.trialEndsAt.getTime() <= Date.now()
-  );
-}
 
 async function resolveTenantContext(): Promise<TenantContext | null> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -63,7 +53,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
     role: user.role ?? 'STAFF',
     isOwner: user.isOwner ?? false,
     tenantId: tenant.id,
-    trialExpired: isTrialExpired(tenant),
+    trialExpired: isTrialExpired(tenant.subscriptionStatus, tenant.trialEndsAt),
     tenant: { ...tenant, status: tenant.status, subscriptionTier: tenant.subscriptionTier, subscriptionStatus: tenant.subscriptionStatus },
   };
 }

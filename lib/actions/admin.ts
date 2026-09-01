@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requirePlatformAdmin } from '@/lib/admin';
+import { slugify } from '@/lib/slug';
 
 export async function adminGetDashboard() {
   await requirePlatformAdmin();
@@ -82,14 +83,8 @@ export async function adminCreateTenant(input: AdminCreateTenantInput) {
   const name = input.name.trim();
   if (!name) throw new Error('Business name is required');
 
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const slug =
-    base ||
-    `tenant-${Date.now()}`;
+  const base = slugify(name);
+  const slug = base === 'business' ? `tenant-${Date.now()}` : base;
 
   let slugCandidate = slug;
   let i = 2;
