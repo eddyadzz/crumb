@@ -37,6 +37,7 @@ Copy `.env.example` to `.env` on the server and fill in:
 | `NEXT_PUBLIC_APP_URL` | Same as `BETTER_AUTH_URL` (no trailing slash). Inlined at **build** time into the client bundle — must be set via `--build-arg`/compose `build.args`. |
 | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL` | Sending domain from Mailgun. |
 | `PLATFORM_ADMIN_EMAILS` | Comma-separated emails allowed into `/admin`. |
+| `CRON_TRIAL_SECRET` | Bearer token for the trial-email cron. Generate: `openssl rand -hex 24`. See "Trial lifecycle cron" below. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Default `crumb`/`crumb`/`crumb`; override for prod. |
 | `PORT` / `WEB_PORT` | Container listens on 3000; `WEB_PORT` is the host mapping. |
 
@@ -58,6 +59,21 @@ docker compose up -d --build web
 
 Verify: `curl -I https://app.yourdomain.com/sign-in` → 200, then sign in with the
 seeded `owner@crumb.mv` (OTP email arrives from Mailgun).
+
+## Trial lifecycle cron
+
+Trial reminder/expired emails (7d, 3d, 1d, then Expired) are sent by a cron
+that hits one bearer-gated endpoint. Schedule it to fire roughly daily:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_TRIAL_SECRET" \
+  https://app.yourdomain.com/api/cron/trial-emails
+```
+
+The handler is idempotent (persists which milestone it sent per trial), so
+overrunning frequency is safe. Examples: a distro/systemd timer, a separate
+host cron, or an HTTP cron provider (e.g. Cronitor/Cronhub). Protect the token
+and do not expose `CRON_TRIAL_SECRET` in public repos.
 
 ## HTTPS (recommended)
 
