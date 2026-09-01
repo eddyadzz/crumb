@@ -40,15 +40,9 @@ const allNav = [...mainNav, ...moreNav];
 
 export type AccountSummary = {
   tenantName: string;
-  plan: string;
+  planName: string;
   subscriptionStatus: string;
   trialEndsAt: string | null;
-};
-
-const PLAN_LABEL: Record<string, string> = {
-  FREE: 'Free',
-  PRO: 'Pro',
-  BUSINESS: 'Business',
 };
 
 export function AppShell({
@@ -64,12 +58,11 @@ export function AppShell({
   const onTrial = account.subscriptionStatus === 'TRIAL';
   const daysLeft = onTrial ? trialDaysLeft(account.trialEndsAt) : null;
   const trialExpired = onTrial && daysLeft !== null && daysLeft === 0;
-  const planLabel = PLAN_LABEL[account.plan] ?? account.plan;
   const planLine = onTrial
     ? trialExpired
-      ? `${planLabel} Plan · trial ended`
-      : `${planLabel} Plan · trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
-    : `${planLabel} Plan`;
+      ? `${account.planName} Plan · trial ended`
+      : `${account.planName} Plan · trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+    : `${account.planName} Plan`;
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);

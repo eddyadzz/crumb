@@ -12,9 +12,9 @@ export default async function AppLayout({
     <AppShell
       account={{
         tenantName: ctx.tenant.name,
-        plan: ctx.tenant.subscriptionTier,
-        subscriptionStatus: ctx.tenant.subscriptionStatus,
-        trialEndsAt: ctx.tenant.trialEndsAt?.toISOString() ?? null,
+        planName: ctx.tenant.plan?.name ?? 'Custom',
+        subscriptionStatus: ctx.tenant.subscription?.status ?? 'ACTIVE',
+        trialEndsAt: ctx.tenant.subscription?.trialEndsAt?.toISOString() ?? null,
       }}
     >
       {children}

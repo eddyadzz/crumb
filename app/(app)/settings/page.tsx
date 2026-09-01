@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, User, Bell, Globe, Moon, Info, LogOut, Loader2 } from 'lucide-react';
+import { User, Bell, Moon, Info, LogOut, Loader2, CreditCard, Check } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -10,25 +10,33 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
-import { getAccountInfo } from '@/lib/actions/tenant';
-import type { AccountInfo } from '@/lib/actions/tenant';
+import { getAccountInfo, listPlans } from '@/lib/actions/tenant';
+import type { AccountInfo, PlanInfo } from '@/lib/actions/tenant';
+import { FEATURE_KEYS } from '@/lib/plans';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [plans, setPlans] = useState<PlanInfo[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    getAccountInfo()
-      .then((info) => {
-        if (!cancelled) setAccount(info);
+    Promise.all([getAccountInfo(), listPlans()])
+      .then(([info, planList]) => {
+        if (cancelled) return;
+        setAccount(info);
+        setPlans(planList);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const includedFeatures = account
+    ? FEATURE_KEYS.filter((f) => account.planFeatures[f] === true)
+    : [];
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -58,7 +66,7 @@ export default function SettingsPage() {
             </div>
             {account && (
               <Badge variant="secondary">
-                {account.subscriptionTier}
+                {account.planName ?? 'Loading...'}
                 {account.subscriptionStatus === 'TRIAL' ? ' · Trial' : ''}
               </Badge>
             )}
@@ -116,6 +124,74 @@ export default function SettingsPage() {
             )}
             Sign Out
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+            Billing &amp; Plan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-3">
+            {plans.length === 0 && (
+              <p className="text-sm text-muted-foreground">Loading plans...</p>
+            )}
+            {plans.map((p) => {
+              const current = p.code === account?.planCode;
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-border p-4"
+                >
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {p.name}
+                      {current && (
+                        <Badge variant="secondary" className="ml-2">
+                          Current
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      MVR {p.monthlyPrice}/mo or MVR {p.yearlyPrice}/yr
+                    </p>
+                    {current && includedFeatures.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {includedFeatures.map((f) => (
+                          <span
+                            key={f}
+                            className="inline-flex items-center gap-1 rounded-full bg-primary/5 px-2 py-0.5 text-[11px] font-medium text-primary"
+                          >
+                            <Check className="h-3 w-3" />
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {current ? (
+                    <Badge variant="outline">Active</Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      title="Online payments are coming soon"
+                    >
+                      Switch plan
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="pt-1 text-xs text-muted-foreground">
+            Upgrades and downgrades at checkout are coming soon. Contact BoliFlow to
+            change plans today.
+          </p>
         </CardContent>
       </Card>
 
