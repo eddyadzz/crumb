@@ -3,6 +3,8 @@ import {
   otpEmailContent,
   welcomeEmailContent,
   trialStartedEmailContent,
+  trialReminderEmailContent,
+  trialExpiredEmailContent,
   subscriptionActivatedEmailContent,
   type EmailContent,
 } from './templates';
@@ -97,6 +99,40 @@ export async function sendTrialStartedEmail({
   await sendMail({
     to,
     content: trialStartedEmailContent({ tenantName, planName, trialEndsAt }),
+  });
+}
+
+export async function sendTrialReminderEmail({
+  to,
+  tenantName,
+  planName,
+  trialEndsAt,
+  daysLeft,
+}: {
+  to: string;
+  tenantName: string;
+  planName: string;
+  trialEndsAt: Date;
+  daysLeft: number;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: trialReminderEmailContent({ tenantName, planName, trialEndsAt, daysLeft }),
+  });
+}
+
+export async function sendTrialExpiredEmail({
+  to,
+  tenantName,
+  planName,
+}: {
+  to: string;
+  tenantName: string;
+  planName: string;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: trialExpiredEmailContent({ tenantName, planName }),
   });
 }
 

@@ -3,8 +3,45 @@ import {
   otpEmailContent,
   welcomeEmailContent,
   trialStartedEmailContent,
+  trialReminderEmailContent,
+  trialExpiredEmailContent,
   subscriptionActivatedEmailContent,
 } from '@/lib/mail/templates';
+
+describe('trial lifecycle emails', () => {
+  it('reminder emails pluralise days and state the end date', () => {
+    const { subject, html } = trialReminderEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Pro',
+      trialEndsAt: new Date('2026-09-09T12:00:00Z'),
+      daysLeft: 3,
+    });
+    expect(subject).toContain('3 days left');
+    expect(html).toContain('Sweet Crumbs Bakery');
+    expect(html).toContain('Pro');
+    expect(html).toContain('September 9');
+  });
+
+  it('reminder singularises for a single day left', () => {
+    const { subject } = trialReminderEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Pro',
+      trialEndsAt: new Date('2026-09-03T12:00:00Z'),
+      daysLeft: 1,
+    });
+    expect(subject).toContain('1 day left');
+  });
+
+  it('expired emails reassure the workspace is safe', () => {
+    const { subject, text } = trialExpiredEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Pro',
+    });
+    expect(subject).toContain('has ended');
+    expect(text).toContain('workspace is safe');
+    expect(text).toContain('Upgrade any time');
+  });
+});
 
 describe('email templates', () => {
   it('otp emails carry the code and a clear subject', () => {

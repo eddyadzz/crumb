@@ -41,6 +41,7 @@ export async function createTenant(input: CreateTenantInput) {
 
   const slug = await uniqueSlug(name);
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const trialStartedAt = new Date();
   const freePlan = await prisma.plan.findUnique({ where: { code: 'free' } });
   if (!freePlan) return { error: 'Setup incomplete: free plan is missing' };
 
@@ -65,6 +66,7 @@ export async function createTenant(input: CreateTenantInput) {
         startsAt: new Date(),
         endsAt: trialEndsAt,
         trialEndsAt,
+        trialStartedAt,
         autoRenew: true,
       },
     });

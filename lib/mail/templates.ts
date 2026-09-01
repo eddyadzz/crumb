@@ -102,3 +102,56 @@ export function subscriptionActivatedEmailContent({
     [`${planName} subscription is now active for ${tenantName}.`, `Billed at ${price}.`]
   );
 }
+
+/** Urgency copy for the N-days-left reminder. Pure so it is unit-testable. */
+export function trialReminderEmailContent({
+  tenantName,
+  planName,
+  trialEndsAt,
+  daysLeft,
+}: {
+  tenantName: string;
+  planName: string;
+  trialEndsAt: Date;
+  daysLeft: number;
+}): EmailContent {
+  const ends = trialEndsAt.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const subject = `${daysLeft} ${
+    daysLeft === 1 ? 'day' : 'days'
+  } left on your ${planName} trial for ${tenantName}`;
+  return shell(
+    subject,
+    `Your ${planName} trial for ${tenantName} ends in ${daysLeft} ${
+      daysLeft === 1 ? 'day' : 'days'
+    }.`,
+    copy(`Your trial runs until ${ends}. Upgrade to keep ${planName} features and pricing — no credit card needed to keep your workspace, you'll only be billed once your trial ends.`),
+    [
+      `Your ${planName} trial for ${tenantName} ends in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} (${ends}).`,
+      'Upgrade any time to keep your workspace.',
+    ]
+  );
+}
+
+export function trialExpiredEmailContent({
+  tenantName,
+  planName,
+}: {
+  tenantName: string;
+  planName: string;
+}): EmailContent {
+  const subject = `Your ${planName} trial for ${tenantName} has ended`;
+  return shell(
+    subject,
+    `Your ${planName} trial for ${tenantName} has ended.`,
+    copy(`Your workspace is paused for editing. Nothing has been deleted — upgrade any time to reactivate ${planName} features and pick up right where you left off.`),
+    [
+      `Your ${planName} trial for ${tenantName} has ended.`,
+      'Editing is paused, but your workspace is safe.',
+      'Upgrade any time to reactivate your plan.',
+    ]
+  );
+}

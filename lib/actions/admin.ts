@@ -276,7 +276,10 @@ export async function adminSetPlan(input: {
   const now = new Date();
 
   let trialEndsAt = existing.trialEndsAt;
+  let trialStartedAt = existing.trialStartedAt;
+  let trialEmailSentFor: string | null = existing.trialEmailSentFor;
   if (status === 'TRIAL') {
+    const isFreshTrial = existing.status !== 'TRIAL' || !existing.trialStartedAt;
     const base =
       existing.status === 'TRIAL' && existing.trialEndsAt && existing.trialEndsAt > now
         ? existing.trialEndsAt
@@ -285,6 +288,10 @@ export async function adminSetPlan(input: {
       typeof input.trialDays === 'number'
         ? new Date(base.getTime() + input.trialDays * 24 * 60 * 60 * 1000)
         : base;
+    if (isFreshTrial) {
+      trialStartedAt = now;
+      trialEmailSentFor = null;
+    }
   } else {
     trialEndsAt = null;
   }
@@ -303,7 +310,7 @@ export async function adminSetPlan(input: {
 
   const updated = await prisma.subscription.update({
     where: { tenantId: input.tenantId },
-    data: { planId: plan.id, status, trialEndsAt, endsAt, startsAt },
+    data: { planId: plan.id, status, trialEndsAt, trialStartedAt, trialEmailSentFor, endsAt, startsAt },
     include: {
       plan: { select: { code: true, name: true, monthlyPrice: true, yearlyPrice: true } },
     },
@@ -341,10 +348,14 @@ export async function adminExtendTrial(input: { tenantId: string; days: number }
       ? existing.trialEndsAt
       : now;
   const trialEndsAt = new Date(base.getTime() + input.days * 24 * 60 * 60 * 1000);
+  const trialStartedAt = existing.trialStartedAt ?? now;
+  // A manual extension restarts the reminder sequence so the tenant is nudged
+  // again toward the new (later) expiry.
+  const trialEmailSentFor: string | null = null;
 
   await prisma.subscription.update({
     where: { tenantId: input.tenantId },
-    data: { status: 'TRIAL', trialEndsAt, endsAt: trialEndsAt, autoRenew: true },
+    data: { status: 'TRIAL', trialEndsAt, trialStartedAt, trialEmailSentFor, endsAt: trialEndsAt, autoRenew: true },
   });
 
   revalidatePath('/admin');

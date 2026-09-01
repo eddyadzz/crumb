@@ -32,8 +32,11 @@ export async function proxy(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
   const isApiAuth = pathname.startsWith('/api/auth');
+  const isApiCron = pathname.startsWith('/api/cron');
 
-  if (isPublic || isApiAuth) return NextResponse.next();
+  // Auth + cron endpoints are public at the proxy; auth is handled inside the
+  // route (bearer token for cron, better-auth for auth).
+  if (isPublic || isApiAuth || isApiCron) return NextResponse.next();
 
   const sessionCookie = getSessionCookie(request, { cookiePrefix: 'crumb' });
 
