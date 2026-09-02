@@ -218,6 +218,32 @@ export function subscriptionRejectedEmailContent({
   );
 }
 
+export function inviteEmailContent({
+  tenantName,
+  role,
+  inviteUrl,
+}: {
+  tenantName: string;
+  role: string;
+  inviteUrl: string;
+}): EmailContent {
+  const roleText = { OWNER: 'owner', MANAGER: 'manager', STAFF: 'staff' }[role] ?? role;
+  const subject = `You've been invited to ${tenantName} on Crumb`;
+  return shell(
+    subject,
+    `You've been invited to join ${tenantName} on Crumb as a <strong>${roleText}</strong>.`,
+    copy(`Click the button below to accept this invitation. It expires in 7 days.`) +
+      `<div style="margin:20px 0;">
+        <a href="${inviteUrl}" style="display:inline-block;padding:12px 20px;background:${accent};color:#ffffff;border-radius:10px;text-decoration:none;font-weight:600;">Accept invitation</a>
+      </div>` +
+      copy(`If you don't have a Crumb account yet, you'll be asked to sign up — the invite will connect you to ${tenantName} automatically.`),
+    [
+      `You've been invited to join ${tenantName} on Crumb as a ${roleText}.`,
+      `Accept the invitation here: ${inviteUrl}`,
+      'It expires in 7 days.',
+    ]
+  );
+}
 export function notificationDigestEmailContent({
   tenantName,
   lines,

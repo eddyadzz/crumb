@@ -410,10 +410,10 @@ export function AdminClient({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {t._count.users}
-                        {t.users[0] && (
+                        {t._count.memberships}
+                        {t.memberships[0] && (
                           <span className="block text-xs text-muted-foreground">
-                            {t.users[0].email}
+                            {t.memberships[0].user.email}
                           </span>
                         )}
                       </TableCell>

@@ -34,9 +34,9 @@ export async function sendTrialEmails(input: { next: number } = { next: 1 }): Pr
           id: true,
           name: true,
           email: true,
-          users: {
-            where: { isOwner: true },
-            select: { email: true },
+          memberships: {
+            where: { role: 'OWNER' },
+            select: { user: { select: { email: true } } },
             take: 1,
           },
         },
@@ -57,7 +57,7 @@ export async function sendTrialEmails(input: { next: number } = { next: 1 }): Pr
 
     if (action.kind === 'none') continue;
 
-    const to = sub.tenant.email ?? sub.tenant.users[0]?.email;
+    const to = sub.tenant.email ?? sub.tenant.memberships[0]?.user.email;
     if (!to) continue;
 
     const wasSent = await deliver(action, to, sub.plan.name, sub.tenant.name, sub.trialEndsAt);

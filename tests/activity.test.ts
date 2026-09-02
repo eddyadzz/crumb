@@ -41,6 +41,10 @@ describe('activity-core', () => {
       'UPGRADE_REJECTED',
       'USER_INVITED',
       'USER_REMOVED',
+      'INVITE_SENT',
+      'INVITE_ACCEPTED',
+      'MEMBER_REMOVED',
+      'ROLE_CHANGED',
       'SYSTEM',
     ] as const;
     for (const t of types) {

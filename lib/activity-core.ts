@@ -32,6 +32,10 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   UPGRADE_REJECTED: 'Upgrade rejected',
   USER_INVITED: 'User invited',
   USER_REMOVED: 'User removed',
+  INVITE_SENT: 'Invite sent',
+  INVITE_ACCEPTED: 'Invite accepted',
+  MEMBER_REMOVED: 'Member removed',
+  ROLE_CHANGED: 'Role changed',
   SYSTEM: 'System',
 };
 

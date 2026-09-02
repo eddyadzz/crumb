@@ -35,7 +35,12 @@ export async function createTenant(input: CreateTenantInput) {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = session?.user;
   if (!user) return { error: 'Unauthorized' };
-  if (user.tenantId) return { error: 'You are already part of a business' };
+
+  const existingMembership = await prisma.membership.findFirst({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (existingMembership) return { error: 'You are already part of a business' };
 
   const name = input.businessName.trim();
   if (!name) return { error: 'Business name is required' };
@@ -74,7 +79,11 @@ export async function createTenant(input: CreateTenantInput) {
 
     await tx.user.update({
       where: { id: user.id },
-      data: { tenantId: t.id, role: 'OWNER', isOwner: true },
+      data: { tenantId: t.id },
+    });
+
+    await tx.membership.create({
+      data: { userId: user.id, tenantId: t.id, role: 'OWNER' },
     });
 
     return t;

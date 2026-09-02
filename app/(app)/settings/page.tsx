@@ -41,6 +41,7 @@ import {
   type NotificationPrefs,
 } from '@/lib/actions/notifications';
 import { cn } from '@/lib/utils';
+import { TeamCard } from './team-card';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -186,6 +187,8 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {account && <TeamCard role={account.role} />}
 
       <Card>
         <CardHeader>

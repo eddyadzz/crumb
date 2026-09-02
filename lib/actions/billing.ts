@@ -134,13 +134,13 @@ export async function submitSubscriptionRequest(
   });
 
   // Best-effort notification; the request is already saved.
-  const owner = await prisma.user.findFirst({
-    where: { tenantId: ctx.tenantId, isOwner: true },
-    select: { email: true },
+  const owner = await prisma.membership.findFirst({
+    where: { tenantId: ctx.tenantId, role: 'OWNER' },
+    select: { user: { select: { email: true } } },
   });
-  if (owner?.email) {
+  if (owner?.user.email) {
     await sendSubscriptionRequestReceivedEmail({
-      to: owner.email,
+      to: owner.user.email,
       tenantName: ctx.tenant.name,
       planName: plan.name,
     }).catch(() => {});

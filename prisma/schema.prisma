@@ -113,6 +113,10 @@ enum ActivityType {
   UPGRADE_REJECTED
   USER_INVITED
   USER_REMOVED
+  INVITE_SENT
+  INVITE_ACCEPTED
+  MEMBER_REMOVED
+  ROLE_CHANGED
   SYSTEM
 }
 
@@ -133,6 +137,8 @@ model Tenant {
   notifBillingEmail    Boolean               @default(true)
   notifTrialEmail      Boolean               @default(true)
   users                User[]
+  memberships          Membership[]
+  invitations          Invitation[]
   subscription         Subscription?
   subscriptionRequests SubscriptionRequest[]
   ingredients          Ingredient[]
@@ -483,6 +489,8 @@ model User {
   sessions                     Session[]
   accounts                     Account[]
   reviewedSubscriptionRequests SubscriptionRequest[]
+  memberships                  Membership[]
+  invitationsSent              Invitation[]
 
   @@index([tenantId])
 }
@@ -514,6 +522,40 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      UserRole @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       UserRole
+  token      String    @unique
+  expiresAt  DateTime
+  invitedById String?
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy  User?     @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([email])
 }
 
 model Verification {

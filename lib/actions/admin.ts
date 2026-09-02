@@ -67,8 +67,13 @@ export async function adminListTenants() {
 
   return prisma.tenant.findMany({
     include: {
-      users: { select: { id: true, name: true, email: true, role: true, isOwner: true, createdAt: true } },
-      _count: { select: { users: true } },
+      memberships: {
+        include: {
+          user: { select: { id: true, name: true, email: true, createdAt: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
+      _count: { select: { memberships: true, users: true } },
       subscription: {
         select: {
           status: true,
@@ -171,11 +176,11 @@ export async function adminCreateTenant(input: AdminCreateTenantInput) {
   let ownerName: string | null = null;
   if (input.ownerEmail?.trim()) {
     ownerEmail = input.ownerEmail.trim().toLowerCase();
-    const existingOwner = await prisma.user.findUnique({
-      where: { email: ownerEmail },
-      select: { id: true, tenantId: true },
+    const existingMembership = await prisma.membership.findFirst({
+      where: { user: { email: ownerEmail } },
+      select: { id: true },
     });
-    if (existingOwner?.tenantId) {
+    if (existingMembership) {
       throw new Error(
         `User ${ownerEmail} already belongs to another business and cannot be made owner`
       );
@@ -212,18 +217,22 @@ export async function adminCreateTenant(input: AdminCreateTenantInput) {
       if (existingOwner) {
         await tx.user.update({
           where: { id: existingOwner.id },
-          data: { tenantId: t.id, role: 'OWNER', isOwner: true, name: candidateName || undefined },
+          data: { tenantId: t.id, name: candidateName || undefined },
+        });
+        await tx.membership.create({
+          data: { userId: existingOwner.id, tenantId: t.id, role: 'OWNER' },
         });
       } else {
-        await tx.user.create({
+        const created = await tx.user.create({
           data: {
             name: candidateName || name,
             email: ownerEmail,
             emailVerified: true,
             tenantId: t.id,
-            role: 'OWNER',
-            isOwner: true,
           },
+        });
+        await tx.membership.create({
+          data: { userId: created.id, tenantId: t.id, role: 'OWNER' },
         });
       }
       ownerName = candidateName || name;

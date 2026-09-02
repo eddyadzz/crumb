@@ -11,8 +11,6 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       tenantId: { type: 'string' },
-      role: { type: 'string', input: false },
-      isOwner: { type: 'boolean', input: false },
     },
   },
   plugins: [

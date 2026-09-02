@@ -43,6 +43,15 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
   const user = session?.user;
   if (!user) return null;
 
+  // Role + tenant ownership come from the Membership join table. The
+  // user.tenantId column is kept as a lightweight "active tenant" pointer.
+  const membership = user.tenantId
+    ? await prisma.membership.findUnique({
+        where: { userId_tenantId: { userId: user.id, tenantId: user.tenantId } },
+        select: { role: true },
+      })
+    : null;
+
   const tenant = user.tenantId
     ? await prisma.tenant.findUnique({
         where: { id: user.tenantId },
@@ -64,6 +73,9 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
     : null;
   if (!tenant || tenant.status === 'SUSPENDED') return null;
 
+  const role = membership?.role ?? 'STAFF';
+  const isOwner = membership?.role === 'OWNER';
+
   const subscription = tenant.subscription;
   const plan = subscription?.plan ?? null;
   const trialExpired = isTrialExpired(
@@ -75,8 +87,8 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
     userId: user.id,
     email: user.email,
     name: user.name,
-    role: user.role ?? 'STAFF',
-    isOwner: user.isOwner ?? false,
+    role,
+    isOwner,
     tenantId: tenant.id,
     trialExpired,
     tenant: {

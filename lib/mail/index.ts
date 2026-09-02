@@ -10,6 +10,7 @@ import {
   subscriptionApprovedEmailContent,
   subscriptionRejectedEmailContent,
   notificationDigestEmailContent,
+  inviteEmailContent,
   type EmailContent,
 } from './templates';
 
@@ -218,5 +219,22 @@ export async function sendNotificationDigestEmail({
   await sendMail({
     to,
     content: notificationDigestEmailContent({ tenantName, lines }),
+  });
+}
+
+export async function sendInviteEmail({
+  to,
+  tenantName,
+  role,
+  inviteUrl,
+}: {
+  to: string;
+  tenantName: string;
+  role: string;
+  inviteUrl: string;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: inviteEmailContent({ tenantName, role, inviteUrl }),
   });
 }

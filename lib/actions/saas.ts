@@ -206,5 +206,9 @@ const ACTIVITY_KIND: Record<string, string> = {
   UPGRADE_REJECTED: 'upgrade',
   USER_INVITED: 'user',
   USER_REMOVED: 'user',
+  INVITE_SENT: 'user',
+  INVITE_ACCEPTED: 'user',
+  MEMBER_REMOVED: 'user',
+  ROLE_CHANGED: 'user',
   SYSTEM: 'system',
 };
