@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendTrialEmails } from '@/lib/actions/trial';
+import { runJob } from '@/lib/jobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const summary = await sendTrialEmails();
+    let summary: Awaited<ReturnType<typeof sendTrialEmails>> | null = null;
+    await runJob('trial-emails', async () => {
+      summary = await sendTrialEmails();
+    });
     return NextResponse.json(summary);
   } catch (err) {
     return NextResponse.json(

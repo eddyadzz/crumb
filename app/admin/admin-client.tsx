@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Building2,
   Users,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Shield,
   ArrowLeftRight,
+  Briefcase,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -239,10 +241,19 @@ export function AdminClient({
         title="Super Admin"
         description="Platform-wide tenant and billing management"
         action={
-          <span className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary">
-            <Shield className="h-4 w-4" />
-            Admin Portal
-          </span>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/saas"
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10"
+            >
+              <Briefcase className="h-4 w-4" />
+              Operations
+            </Link>
+            <span className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-medium text-primary">
+              <Shield className="h-4 w-4" />
+              Admin Portal
+            </span>
+          </div>
         }
       />
 

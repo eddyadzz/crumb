@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runNotificationsCron } from '@/lib/notifications';
+import { runJob } from '@/lib/jobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const summary = await runNotificationsCron();
+    let summary: Awaited<ReturnType<typeof runNotificationsCron>> | null = null;
+    await runJob('notifications', async () => {
+      summary = await runNotificationsCron();
+    });
     return NextResponse.json(summary);
   } catch (err) {
     return NextResponse.json(
