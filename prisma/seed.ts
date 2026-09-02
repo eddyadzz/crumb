@@ -20,6 +20,8 @@ async function main() {
   await prisma.ingredientMovement.deleteMany();
   await prisma.ingredient.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.subscriptionRequest.deleteMany();
+  await prisma.paymentMethod.deleteMany();
   await prisma.plan.deleteMany();
   await prisma.tenant.deleteMany();
 
@@ -61,6 +63,17 @@ async function main() {
     },
   ];
   await prisma.plan.createMany({ data: plans });
+
+  // --- Payment methods (auto/manual billing catalog) ---
+  const paymentMethods = [
+    { code: 'BANK_TRANSFER', name: 'Bank Transfer', currency: 'MVR', details: 'BML / MIB account details', sortOrder: 0 },
+    { code: 'PAYPAL', name: 'PayPal', currency: null, details: 'PayPal email', sortOrder: 1 },
+    { code: 'SKRILL', name: 'Skrill', currency: null, details: 'Skrill email', sortOrder: 2 },
+    { code: 'BINANCE', name: 'Binance', currency: null, details: 'Binance UID', sortOrder: 3 },
+    { code: 'USDT_TRC20', name: 'USDT (TRC20)', currency: 'USDT', details: 'TRC20 wallet address', sortOrder: 4 },
+    { code: 'USDT_BEP20', name: 'USDT (BEP20)', currency: 'USDT', details: 'BEP20 wallet address', sortOrder: 5 },
+  ];
+  await prisma.paymentMethod.createMany({ data: paymentMethods });
 
   // --- Demo tenant ---
   const trialEnd = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
