@@ -12,6 +12,15 @@ export interface CreateProductionOrderInput {
   items: { recipeId: string; batchCount: number }[];
 }
 
+/** Per-production-item actual ingredient usage, in base units, keyed by
+ * ingredientId. Omitting an ingredient means the actual equals the planned
+ * amount (the batch was completed exactly to plan). */
+export interface ProductionActualInput {
+  productionItemId: string;
+  ingredientId: string;
+  actualBase: number;
+}
+
 export async function createProductionOrder(input: CreateProductionOrderInput) {
   const { tenantId } = await requireTenantWritable();
 
@@ -71,7 +80,10 @@ export async function startProductionOrder(orderId: string) {
   return true;
 }
 
-export async function completeProductionOrder(orderId: string) {
+export async function completeProductionOrder(
+  orderId: string,
+  actuals?: ProductionActualInput[]
+): Promise<boolean> {
   const { tenantId } = await requireTenantWritable();
   const order = await prisma.productionOrder.findUnique({
     where: { id: orderId, tenantId },
@@ -89,16 +101,28 @@ export async function completeProductionOrder(orderId: string) {
     },
   });
   if (!order) throw new Error('Order not found');
+  if (order.status !== 'IN_PROGRESS') {
+    throw new Error('Only an in-progress production order can be completed');
+  }
 
-  // Stock policy: with BLOCK, refuse to complete when any ingredient is short.
+  // Normalise actual usage: default to planned when not provided.
+  const actualMap = new Map<string, number>();
+  for (const a of actuals ?? []) actualMap.set(`${a.productionItemId}:${a.ingredientId}`, a.actualBase);
+
+  // Stock policy: with BLOCK, refuse to complete when any ingredient is short
+  // (based on the actual amounts we intend to deduct).
   const [tenant] = await Promise.all([
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { stockPolicy: true } }),
   ]);
   const requirements = order.items.flatMap((item) =>
-    item.recipe.recipeIngredients.map((ri) => ({
-      requiredBase: convertToBase(ri.quantity, ri.unit) * item.batchCount,
-      availableBase: ri.ingredient.availableQuantity,
-    }))
+    item.recipe.recipeIngredients.map((ri) => {
+      const plannedBase = convertToBase(ri.quantity, ri.unit) * item.batchCount;
+      const actualBase = actualMap.get(`${item.id}:${ri.ingredientId}`) ?? plannedBase;
+      return {
+        requiredBase: Math.max(plannedBase, actualBase),
+        availableBase: ri.ingredient.availableQuantity,
+      };
+    })
   );
   const { blocked, shortages } = blockForShortage(
     tenant?.stockPolicy ?? 'WARN',
@@ -110,13 +134,15 @@ export async function completeProductionOrder(orderId: string) {
     );
   }
 
-  // Deduct ingredients & log PRODUCTION movements
+  // Deduct ingredients (actual amounts) & snapshot planned-vs-actual variance;
+  // log PRODUCTION movements.
   const lowStock: { id: string; name: string; availableQuantity: number; reorderLevel: number }[] = [];
   for (const item of order.items) {
     for (const ri of item.recipe.recipeIngredients) {
-      const neededBase = convertToBase(ri.quantity, ri.unit) * item.batchCount;
+      const plannedBase = convertToBase(ri.quantity, ri.unit) * item.batchCount;
+      const actualBase = actualMap.get(`${item.id}:${ri.ingredientId}`) ?? plannedBase;
       const ingredient = ri.ingredient;
-      const newQty = Math.max(0, ingredient.availableQuantity - neededBase);
+      const newQty = Math.max(0, ingredient.availableQuantity - actualBase);
       await prisma.ingredient.update({
         where: { id: ingredient.id, tenantId },
         data: { availableQuantity: newQty },
@@ -125,8 +151,17 @@ export async function completeProductionOrder(orderId: string) {
         data: {
           ingredientId: ingredient.id,
           type: 'PRODUCTION',
-          quantity: -neededBase,
+          quantity: -actualBase,
           notes: `Used for ${item.recipe.name} (${item.batchCount} batch)`,
+        },
+      });
+      await prisma.productionItemIngredient.create({
+        data: {
+          productionItemId: item.id,
+          ingredientId: ingredient.id,
+          ingredientName: ingredient.name,
+          plannedQuantity: plannedBase,
+          actualQuantity: actualBase,
         },
       });
       if (newQty <= ingredient.reorderLevel) {

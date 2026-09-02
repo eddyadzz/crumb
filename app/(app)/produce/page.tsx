@@ -9,7 +9,10 @@ export default async function ProducePage() {
   const [recipes, orders] = await Promise.all([
     prisma.recipe.findMany({
       where: { tenantId },
-      include: { recipeIngredients: { include: { ingredient: true } } },
+      include: {
+        recipeIngredients: { include: { ingredient: true } },
+        products: { select: { id: true, name: true, type: true } },
+      },
       orderBy: { name: 'asc' },
     }),
     prisma.productionOrder.findMany({
@@ -20,6 +23,7 @@ export default async function ProducePage() {
             recipe: {
               include: { recipeIngredients: { include: { ingredient: true } } },
             },
+            ingredientActuals: true,
           },
         },
       },
@@ -30,8 +34,12 @@ export default async function ProducePage() {
   const recipesVM = recipes.map((r) => ({
     id: r.id,
     name: r.name,
+    description: r.description,
+    instructions: r.instructions,
+    preparationTime: r.preparationTime,
     servingsProduced: r.servingsProduced,
     totalCost: r.packagingCost + r.utilityCost + r.laborCost,
+    products: r.products.map((p) => ({ id: p.id, name: p.name, type: p.type })),
     ingredients: r.recipeIngredients.map((ri) => ({
       ingredientId: ri.ingredientId,
       name: ri.ingredient.name,
@@ -52,6 +60,12 @@ export default async function ProducePage() {
       recipeId: item.recipeId,
       recipeName: item.recipe.name,
       batchCount: item.batchCount,
+      ingredientActuals: item.ingredientActuals.map((ia) => ({
+        ingredientId: ia.ingredientId,
+        ingredientName: ia.ingredientName,
+        plannedBase: ia.plannedQuantity,
+        actualBase: ia.actualQuantity,
+      })),
     })),
   }));
 

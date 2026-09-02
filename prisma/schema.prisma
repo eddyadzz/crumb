@@ -257,6 +257,7 @@ model Ingredient {
   updatedAt         DateTime             @updatedAt
   movements         IngredientMovement[]
   recipeIngredients RecipeIngredient[]
+  productionActuals ProductionItemIngredient[]
 
   @@index([tenantId])
 }
@@ -323,14 +324,32 @@ model ProductionOrder {
 }
 
 model ProductionItem {
-  id                String          @id @default(cuid())
+  id                String                       @id @default(cuid())
   productionOrderId String
-  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  productionOrder   ProductionOrder              @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   recipeId          String
-  recipe            Recipe          @relation(fields: [recipeId], references: [id])
+  recipe            Recipe                       @relation(fields: [recipeId], references: [id])
   batchCount        Int
+  ingredientActuals ProductionItemIngredient[]
 
   @@index([productionOrderId])
+}
+
+/** Snapshot of planned vs actual ingredient usage for a production item, in
+ * base units. Captured at completion time so cost-variance reporting (Planned
+ * vs Actual) doesn't mutate the recipe definition. */
+model ProductionItemIngredient {
+  id               String         @id @default(cuid())
+  productionItemId String
+  productionItem   ProductionItem @relation(fields: [productionItemId], references: [id], onDelete: Cascade)
+  ingredientId     String
+  ingredient       Ingredient     @relation(fields: [ingredientId], references: [id])
+  ingredientName   String
+  plannedQuantity  Float
+  actualQuantity   Float
+
+  @@index([productionItemId])
+  @@index([ingredientId])
 }
 
 model Product {
