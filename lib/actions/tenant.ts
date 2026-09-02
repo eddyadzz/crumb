@@ -4,10 +4,11 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { slugify } from '@/lib/slug';
 import { resolvePlanFeatures, type PlanFeatures } from '@/lib/plans';
 import { sendTrialStartedEmail, sendWelcomeEmail } from '@/lib/mail';
+import type { StockPolicy } from '@prisma/client';
 
 const TRIAL_DAYS = 14;
 
@@ -160,4 +161,25 @@ export async function listPlans(): Promise<PlanInfo[]> {
     sortOrder: p.sortOrder,
     features: resolvePlanFeatures(p),
   }));
+}
+
+export async function getStockPolicy(): Promise<StockPolicy> {
+  const { tenantId } = await requireTenant();
+  const t = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { stockPolicy: true },
+  });
+  return t?.stockPolicy ?? 'WARN';
+}
+
+export async function setStockPolicy(policy: StockPolicy) {
+  const { tenantId } = await requireTenantWritable();
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { stockPolicy: policy },
+  });
+  revalidatePath('/');
+  revalidatePath('/produce');
+  revalidatePath('/settings');
+  return policy;
 }

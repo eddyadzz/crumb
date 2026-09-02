@@ -9,6 +9,7 @@ import {
   Carrot,
   ChefHat,
   ShoppingCart,
+  ClipboardList,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const [sales, products, lowStock, productionOrders, recipes] = await Promise.all([
+  const [sales, products, lowStock, productionOrders, recipes, customerOrders] = await Promise.all([
     prisma.sale.findMany({
       where: { tenantId, createdAt: { gte: startOfToday } },
       include: {
@@ -63,6 +64,17 @@ export default async function DashboardPage() {
         products: true,
       },
       orderBy: { name: 'asc' },
+    }),
+    prisma.customerOrder.findMany({
+      where: {
+        tenantId,
+        status: { in: ['CONFIRMED', 'IN_PRODUCTION', 'READY'] },
+        deliveryDate: { not: null },
+      },
+      include: {
+        customer: { select: { name: true } },
+        items: { include: { product: { select: { name: true } } } },
+      },
     }),
   ]);
 
@@ -104,6 +116,20 @@ export default async function DashboardPage() {
     availableQuantity: i.availableQuantity,
     baseUnit: i.baseUnit,
   }));
+
+  const upcomingOrders = customerOrders
+    .sort((a, b) =>
+      (a.deliveryDate?.getTime() ?? Infinity) - (b.deliveryDate?.getTime() ?? Infinity)
+    )
+    .slice(0, 5)
+    .map((o) => ({
+      id: o.id,
+      status: o.status,
+      customerName: o.customer?.name ?? null,
+      deliveryDate: o.deliveryDate!.toISOString(),
+      deliveryTime: o.deliveryTime,
+      itemsLabel: o.items.map((i) => `${i.quantity}× ${i.product.name}`).join(', '),
+    }));
 
   const recipesVM = recipes.map((recipe) => {
     const perServing = recipeCostPerServing(recipe);
@@ -219,6 +245,42 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
+      {upcomingOrders.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ClipboardList className="h-5 w-5 text-muted-foreground" />
+              Upcoming Customer Orders
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/orders">
+                View all
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {upcomingOrders.map((o) => (
+              <div key={o.id} className="flex items-center justify-between rounded-xl border border-border p-3 transition-colors hover:bg-muted/50">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{o.itemsLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.customerName ?? 'Walk-in'} · {new Date(o.deliveryDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {o.deliveryTime ? ` at ${o.deliveryTime}` : ''}
+                  </p>
+                </div>
+                <Badge
+                  variant={o.status === 'READY' ? 'default' : 'secondary'}
+                  className={o.status === 'READY' ? 'bg-success/10 text-success' : ''}
+                >
+                  {o.status === 'READY' ? 'Ready' : o.status === 'IN_PRODUCTION' ? 'In Production' : 'Confirmed'}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {lowStockVM.length > 0 && (
         <Card className="border-warning/30 bg-warning/5">
           <CardHeader className="flex-row items-center justify-between">
@@ -253,10 +315,10 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <QuickAction href="/ingredients" icon={<Carrot className="h-5 w-5" />} label="Add Ingredient" />
-        <QuickAction href="/recipes" icon={<ChefHat className="h-5 w-5" />} label="New Recipe" />
-        <QuickAction href="/produce" icon={<Factory className="h-5 w-5" />} label="Plan Production" />
+        <QuickAction href="/orders?new=1" icon={<ClipboardList className="h-5 w-5" />} label="New Order" />
         <QuickAction href="/sell" icon={<ShoppingCart className="h-5 w-5" />} label="Sell" />
+        <QuickAction href="/produce" icon={<Factory className="h-5 w-5" />} label="Plan Production" />
+        <QuickAction href="/recipes" icon={<ChefHat className="h-5 w-5" />} label="New Recipe" />
       </div>
 
       <Card>

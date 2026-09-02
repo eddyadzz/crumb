@@ -71,6 +71,24 @@ interface PlanItem {
   batchCount: number;
 }
 
+/** Read ?recipes=recipeId:batch,recipeId:batch from the URL to prefill the plan
+ * (used when "Plan Production" is launched from a customer order). */
+function initPlanFromQuery(recipes: RecipeVM[]): PlanItem[] {
+  if (typeof window === 'undefined') return [];
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('recipes');
+  if (!raw) return [];
+  const knownIds = new Set(recipes.map((r) => r.id));
+  return raw
+    .split(',')
+    .map((chunk) => {
+      const [recipeId, batchStr] = chunk.split(':');
+      const batchCount = parseInt(batchStr || '1', 10) || 1;
+      return knownIds.has(recipeId) ? { recipeId, batchCount } : null;
+    })
+    .filter((x) => x !== null) as PlanItem[];
+}
+
 export function ProduceClient({
   recipes,
   orders: initialOrders,
@@ -79,7 +97,7 @@ export function ProduceClient({
   orders: OrderVM[];
 }) {
   const router = useRouter();
-  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [planItems, setPlanItems] = useState<PlanItem[]>(initPlanFromQuery(recipes));
   const [planOpen, setPlanOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 

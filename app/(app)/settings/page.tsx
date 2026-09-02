@@ -13,6 +13,7 @@ import {
   Check,
   UploadCloud,
   ArrowUpRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { authClient } from '@/lib/auth-client';
-import { getAccountInfo, listPlans } from '@/lib/actions/tenant';
+import { getAccountInfo, listPlans, getStockPolicy, setStockPolicy } from '@/lib/actions/tenant';
 import type { AccountInfo, PlanInfo } from '@/lib/actions/tenant';
 import {
   listPaymentMethods,
@@ -34,6 +35,7 @@ import {
   type UpgradeRequestInfo,
 } from '@/lib/actions/billing';
 import { FEATURE_KEYS, FEATURE_LABELS } from '@/lib/plans';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -53,18 +55,20 @@ export default function SettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
+  const [stockPolicy, setStockPolicyState] = useState<'WARN' | 'BLOCK' | null>(null);
 
   const refreshRequests = () =>
     getMyRequests().then(setRequests).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods()])
-      .then(([info, planList, methods]) => {
+    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods(), getStockPolicy()])
+      .then(([info, planList, methods, policy]) => {
         if (cancelled) return;
         setAccount(info);
         setPlans(planList);
         setPaymentMethods(methods);
+        setStockPolicyState(policy);
       })
       .catch(() => {});
     refreshRequests();
@@ -489,6 +493,61 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+            Stock Policy
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            What happens when a production run needs more ingredients than are
+            on hand.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStockPolicyState('WARN');
+                setStockPolicy('WARN');
+              }}
+              className={cn(
+                'rounded-xl border p-3 text-left transition-colors',
+                stockPolicy === 'WARN'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:bg-muted/50'
+              )}
+            >
+              <p className="text-sm font-medium">Warn Only</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Show a warning and let production continue anyway. Good for home
+                businesses.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStockPolicyState('BLOCK');
+                setStockPolicy('BLOCK');
+              }}
+              className={cn(
+                'rounded-xl border p-3 text-left transition-colors',
+                stockPolicy === 'BLOCK'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:bg-muted/50'
+              )}
+            >
+              <p className="text-sm font-medium">Block Production</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Refuse to complete a production run that is short on any
+                ingredient. Stricter, for serious operators.
+              </p>
+            </button>
+          </div>
         </CardContent>
       </Card>
 
