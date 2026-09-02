@@ -5,6 +5,7 @@ import { requireTenant, requirePermission } from '@/lib/tenant';
 import { resolvePlanFeatures, type PlanFeatures } from '@/lib/plans';
 import { sendSubscriptionRequestReceivedEmail } from '@/lib/mail';
 import { recordActivity } from '@/lib/activity';
+import { fireWebhook } from '@/lib/webhooks';
 
 export interface PaymentMethodInfo {
   id: string;
@@ -131,6 +132,13 @@ export async function submitSubscriptionRequest(
     description: `${method.name} · ${input.billingInterval.toLowerCase()}`,
     entityType: 'SubscriptionRequest',
     entityId: request.id,
+  });
+
+  await fireWebhook(ctx.tenantId, 'subscription.requested', {
+    id: request.id,
+    planCode: plan.code,
+    planName: plan.name,
+    billingInterval: input.billingInterval,
   });
 
   // Best-effort notification; the request is already saved.

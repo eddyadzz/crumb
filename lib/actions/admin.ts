@@ -11,6 +11,7 @@ import {
   sendWelcomeEmail,
 } from '@/lib/mail';
 import { recordActivity } from '@/lib/activity';
+import { fireWebhook } from '@/lib/webhooks';
 
 export async function adminGetDashboard() {
   await requirePlatformAdmin();
@@ -513,6 +514,13 @@ export async function adminReviewRequest(input: AdminReviewAction) {
     description: reviewNotes ?? null,
     entityType: 'SubscriptionRequest',
     entityId: request.id,
+  });
+
+  await fireWebhook(request.tenantId, input.status === 'APPROVED' ? 'subscription.approved' : 'subscription.rejected', {
+    id: request.id,
+    planCode: request.requestedPlan.code,
+    planName: request.requestedPlan.name,
+    reviewNotes: reviewNotes ?? undefined,
   });
 
   // Notify the tenant owner (best-effort).

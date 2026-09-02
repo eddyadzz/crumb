@@ -45,6 +45,7 @@ import {
 import { cn } from '@/lib/utils';
 import { TeamCard } from './team-card';
 import { ApiKeysCard } from './api-keys-card';
+import { WebhooksCard } from './webhooks-card';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -199,6 +200,8 @@ export default function SettingsPage() {
       {account && <TeamCard role={account.role} />}
 
       {account && canManageApiKeys && <ApiKeysCard canManage />}
+
+      {canManageSettings && <WebhooksCard />}
 
       {canManageBilling && (
       <Card>

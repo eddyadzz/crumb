@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
 import { recordActivity } from '@/lib/activity';
+import { fireWebhook } from '@/lib/webhooks';
 
 export interface SaleLineItem {
   productId: string;
@@ -60,6 +61,12 @@ export async function processSale(input: { items: SaleLineItem[] }) {
     description: `MVR ${sale.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     entityType: 'Sale',
     entityId: sale.id,
+  });
+
+  await fireWebhook(tenantId, 'sale.completed', {
+    id: sale.id,
+    totalAmount: sale.totalAmount,
+    items: valid.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
   });
 
   revalidatePath('/sell');

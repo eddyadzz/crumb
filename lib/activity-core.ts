@@ -39,6 +39,10 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   API_KEY_CREATED: 'API key created',
   API_KEY_REVOKED: 'API key revoked',
   API_KEY_USED: 'API key used',
+  WEBHOOK_CREATED: 'Webhook created',
+  WEBHOOK_UPDATED: 'Webhook updated',
+  WEBHOOK_DELETED: 'Webhook deleted',
+  WEBHOOK_DELIVERY_FAILED: 'Webhook delivery failed',
   SYSTEM: 'System',
 };
 

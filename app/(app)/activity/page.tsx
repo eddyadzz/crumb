@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   Briefcase,
   KeyRound,
+  Webhook,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -100,6 +101,13 @@ function ActivityIcon({ type }: { type: string }) {
     case 'API_KEY_REVOKED':
     case 'API_KEY_USED':
       return <KeyRound className={`${cls} text-muted-foreground`} />;
+    case 'WEBHOOK_CREATED':
+      return <Webhook className={`${cls} text-cyan-600`} />;
+    case 'WEBHOOK_UPDATED':
+    case 'WEBHOOK_DELETED':
+      return <Webhook className={`${cls} text-muted-foreground`} />;
+    case 'WEBHOOK_DELIVERY_FAILED':
+      return <Webhook className={`${cls} text-destructive`} />;
     default:
       return <Activity className={`${cls} text-muted-foreground`} />;
   }

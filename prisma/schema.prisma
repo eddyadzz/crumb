@@ -120,6 +120,10 @@ enum ActivityType {
   API_KEY_CREATED
   API_KEY_REVOKED
   API_KEY_USED
+  WEBHOOK_CREATED
+  WEBHOOK_UPDATED
+  WEBHOOK_DELETED
+  WEBHOOK_DELIVERY_FAILED
   SYSTEM
 }
 
@@ -154,6 +158,7 @@ model Tenant {
   notifications        Notification[]
   activityEvents       ActivityEvent[]
   apiKeys              ApiKey[]
+  webhookEndpoints     WebhookEndpoint[]
 
   @@index([status])
 }
@@ -496,6 +501,7 @@ model User {
   memberships                  Membership[]
   invitationsSent              Invitation[]
   apiKeys                      ApiKey[]
+  webhookEndpoints             WebhookEndpoint[]
 
   @@index([tenantId])
 }
@@ -580,6 +586,42 @@ model ApiKey {
   createdBy User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model WebhookEndpoint {
+  id          String            @id @default(cuid())
+  tenantId    String
+  name        String
+  url         String
+  secret      String
+  events      String[]
+  isEnabled   Boolean           @default(true)
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy  User               @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  endpointId  String
+  eventType   String
+  statusCode  Int?
+  success     Boolean
+  attempts    Int      @default(1)
+  error       String?
+  deliveredAt DateTime?
+  createdAt   DateTime @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId])
+  @@index([endpointId, success])
 }
 
 model Verification {

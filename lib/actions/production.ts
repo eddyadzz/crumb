@@ -6,6 +6,7 @@ import { requireTenantWritable } from '@/lib/tenant';
 import { convertToBase } from '@/lib/costing';
 import { blockForShortage } from '@/lib/stock';
 import { recordActivity } from '@/lib/activity';
+import { fireWebhook } from '@/lib/webhooks';
 
 export interface CreateProductionOrderInput {
   items: { recipeId: string; batchCount: number }[];
@@ -42,6 +43,10 @@ export async function createProductionOrder(input: CreateProductionOrderInput) {
     title: 'Production batch planned',
     entityType: 'ProductionOrder',
     entityId: order.id,
+  });
+  await fireWebhook(tenantId, 'production.created', {
+    id: order.id,
+    items: order.items.map((i) => ({ recipeId: i.recipeId, batchCount: i.batchCount })),
   });
   revalidatePath('/produce');
   revalidatePath('/products');
@@ -106,6 +111,7 @@ export async function completeProductionOrder(orderId: string) {
   }
 
   // Deduct ingredients & log PRODUCTION movements
+  const lowStock: { id: string; name: string; availableQuantity: number; reorderLevel: number }[] = [];
   for (const item of order.items) {
     for (const ri of item.recipe.recipeIngredients) {
       const neededBase = convertToBase(ri.quantity, ri.unit) * item.batchCount;
@@ -123,6 +129,9 @@ export async function completeProductionOrder(orderId: string) {
           notes: `Used for ${item.recipe.name} (${item.batchCount} batch)`,
         },
       });
+      if (newQty <= ingredient.reorderLevel) {
+        lowStock.push({ id: ingredient.id, name: ingredient.name, availableQuantity: newQty, reorderLevel: ingredient.reorderLevel });
+      }
     }
 
     // Increase product stock
@@ -164,6 +173,25 @@ export async function completeProductionOrder(orderId: string) {
     entityType: 'ProductionOrder',
     entityId: orderId,
   });
+
+  await fireWebhook(tenantId, 'production.completed', {
+    id: orderId,
+    items: order.items.map((i) => ({ recipeName: i.recipe.name, batchCount: i.batchCount })),
+  });
+
+  if (lowStock.length > 0) {
+    const unique = lowStock.filter(
+      (s, i, arr) => arr.findIndex((x) => x.id === s.id) === i
+    );
+    for (const ing of unique) {
+      await fireWebhook(tenantId, 'inventory.low_stock', {
+        ingredientId: ing.id,
+        ingredientName: ing.name,
+        availableQuantity: ing.availableQuantity,
+        reorderLevel: ing.reorderLevel,
+      });
+    }
+  }
 
   revalidatePath('/produce');
   revalidatePath('/products');

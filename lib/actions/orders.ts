@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { orderTotal, canTransition, planFromOrderLines } from '@/lib/orders';
 import { recordActivity } from '@/lib/activity';
+import { fireWebhook } from '@/lib/webhooks';
 import type { OrderStatus } from '@prisma/client';
 
 export const ORDER_STATUSES: OrderStatus[] = [
@@ -142,6 +143,13 @@ export async function createOrder(input: CreateOrderInput) {
     entityId: vm.id,
   });
 
+  await fireWebhook(tenantId, 'order.created', {
+    id: vm.id,
+    totalAmount: vm.totalAmount,
+    customerName: vm.customerName,
+    items: vm.items.map((i) => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice })),
+  });
+
   revalidatePath('/orders');
   revalidatePath('/');
   return vm;
@@ -171,6 +179,7 @@ export async function setOrderStatus(orderId: string, to: OrderStatus) {
       entityType: 'CustomerOrder',
       entityId: orderId,
     });
+    await fireWebhook(tenantId, 'order.confirmed', { id: orderId });
   } else if (to === 'CANCELLED') {
     await recordActivity({
       tenantId,
@@ -179,6 +188,7 @@ export async function setOrderStatus(orderId: string, to: OrderStatus) {
       entityType: 'CustomerOrder',
       entityId: orderId,
     });
+    await fireWebhook(tenantId, 'order.cancelled', { id: orderId });
   }
 
   revalidatePath('/orders');
