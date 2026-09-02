@@ -117,6 +117,9 @@ enum ActivityType {
   INVITE_ACCEPTED
   MEMBER_REMOVED
   ROLE_CHANGED
+  API_KEY_CREATED
+  API_KEY_REVOKED
+  API_KEY_USED
   SYSTEM
 }
 
@@ -150,6 +153,7 @@ model Tenant {
   customerOrders       CustomerOrder[]
   notifications        Notification[]
   activityEvents       ActivityEvent[]
+  apiKeys              ApiKey[]
 
   @@index([status])
 }
@@ -491,6 +495,7 @@ model User {
   reviewedSubscriptionRequests SubscriptionRequest[]
   memberships                  Membership[]
   invitationsSent              Invitation[]
+  apiKeys                      ApiKey[]
 
   @@index([tenantId])
 }
@@ -556,6 +561,25 @@ model Invitation {
 
   @@index([tenantId])
   @@index([email])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  prefix      String
+  keyHash     String    @unique
+  scopes      String[]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }
 
 model Verification {

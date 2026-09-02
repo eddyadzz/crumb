@@ -5,6 +5,7 @@ import {
   Factory,
   ShoppingCart,
   Briefcase,
+  KeyRound,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -94,6 +95,11 @@ function ActivityIcon({ type }: { type: string }) {
     case 'UPGRADE_APPROVED':
     case 'UPGRADE_REJECTED':
       return <Briefcase className={`${cls} text-sky-600`} />;
+    case 'API_KEY_CREATED':
+      return <KeyRound className={`${cls} text-violet-600`} />;
+    case 'API_KEY_REVOKED':
+    case 'API_KEY_USED':
+      return <KeyRound className={`${cls} text-muted-foreground`} />;
     default:
       return <Activity className={`${cls} text-muted-foreground`} />;
   }

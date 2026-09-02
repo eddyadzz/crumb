@@ -44,6 +44,7 @@ import {
 } from '@/lib/actions/notifications';
 import { cn } from '@/lib/utils';
 import { TeamCard } from './team-card';
+import { ApiKeysCard } from './api-keys-card';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -95,6 +96,7 @@ export default function SettingsPage() {
   const role = (account?.role ?? 'STAFF') as UserRole;
   const canManageBilling = hasPermission(role, 'billing.manage');
   const canManageSettings = hasPermission(role, 'settings.manage');
+  const canManageApiKeys = hasPermission(role, 'billing.manage') || hasPermission(role, 'team.manage');
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -195,6 +197,8 @@ export default function SettingsPage() {
       </Card>
 
       {account && <TeamCard role={account.role} />}
+
+      {account && canManageApiKeys && <ApiKeysCard canManage />}
 
       {canManageBilling && (
       <Card>

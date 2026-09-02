@@ -16,6 +16,8 @@ export const FEATURE_KEYS = [
   'analytics',
   'suppliers',
   'activityLogs',
+  'apiAccess',
+  'webhooks',
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -30,6 +32,8 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   analytics: 'Profit Reports',
   suppliers: 'Supplier Directory',
   activityLogs: 'Activity Logs',
+  apiAccess: 'API Access',
+  webhooks: 'Webhooks',
 };
 
 export type PlanFeatures = Partial<Record<FeatureKey, boolean>>;
@@ -53,6 +57,8 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
     analytics: true,
     suppliers: true,
     activityLogs: true,
+    apiAccess: true,
+    webhooks: true,
   },
 };
 

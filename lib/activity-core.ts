@@ -36,6 +36,9 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   INVITE_ACCEPTED: 'Invite accepted',
   MEMBER_REMOVED: 'Member removed',
   ROLE_CHANGED: 'Role changed',
+  API_KEY_CREATED: 'API key created',
+  API_KEY_REVOKED: 'API key revoked',
+  API_KEY_USED: 'API key used',
   SYSTEM: 'System',
 };
 

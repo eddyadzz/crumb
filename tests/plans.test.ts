@@ -42,6 +42,15 @@ describe('resolvePlanFeatures', () => {
     expect(f.orders).toBe(true);
   });
 
+  it('grants apiAccess and webhooks to business but not pro or free', () => {
+    expect(resolvePlanFeatures(business).apiAccess).toBe(true);
+    expect(resolvePlanFeatures(business).webhooks).toBe(true);
+    expect(resolvePlanFeatures(pro).apiAccess).toBe(false);
+    expect(resolvePlanFeatures(pro).webhooks).toBe(false);
+    expect(resolvePlanFeatures(free).apiAccess).toBe(false);
+    expect(resolvePlanFeatures(free).webhooks).toBe(false);
+  });
+
   it('lets DB feature overrides win over the built-in defaults', () => {
     expect(resolvePlanFeatures({ ...pro, features: { analytics: false } }).analytics).toBe(false);
   });

@@ -33,10 +33,12 @@ export async function proxy(request: NextRequest) {
   );
   const isApiAuth = pathname.startsWith('/api/auth');
   const isApiCron = pathname.startsWith('/api/cron');
+  const isApiV1 = pathname.startsWith('/api/v1');
 
   // Auth + cron endpoints are public at the proxy; auth is handled inside the
-  // route (bearer token for cron, better-auth for auth).
-  if (isPublic || isApiAuth || isApiCron) return NextResponse.next();
+  // route (bearer token for cron, better-auth for auth). The v1 REST API is
+  // public at the proxy and authenticates callers with its own bearer tokens.
+  if (isPublic || isApiAuth || isApiCron || isApiV1) return NextResponse.next();
 
   const sessionCookie = getSessionCookie(request, { cookiePrefix: 'crumb' });
 
