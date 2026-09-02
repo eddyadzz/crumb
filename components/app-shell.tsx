@@ -17,23 +17,26 @@ import {
   ClipboardList,
   CalendarDays,
   CalendarRange,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { NotificationsBell } from '@/components/notifications-bell';
 import { useState } from 'react';
 
 const mainNav = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/orders', label: 'Orders', icon: ClipboardList },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/recipes', label: 'Recipes', icon: ChefHat },
   { href: '/produce', label: 'Produce', icon: Factory },
   { href: '/sell', label: 'Sell', icon: ShoppingCart },
 ];
 
 const moreNav = [
+  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/orders', label: 'Orders', icon: ClipboardList },
   { href: '/forecast', label: 'Forecast', icon: CalendarRange },
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/products', label: 'Products', icon: Package },
@@ -110,13 +113,16 @@ export function AppShell({
           })}
         </nav>
         <div className="border-t border-border p-4">
-          <div className="rounded-xl bg-accent/50 p-3">
-            <p className="text-xs font-semibold text-accent-foreground">
-              {planLine}
-            </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {account.tenantName}
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="rounded-xl bg-accent/50 p-3">
+              <p className="text-xs font-semibold text-accent-foreground">
+                {planLine}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {account.tenantName}
+              </p>
+            </div>
+            <NotificationsBell />
           </div>
         </div>
       </aside>
@@ -133,7 +139,9 @@ export function AppShell({
               Crumb
             </span>
           </Link>
-          <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <div className="flex items-center gap-1">
+            <NotificationsBell />
+            <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <MoreHorizontal className="h-5 w-5" />
@@ -177,6 +185,7 @@ export function AppShell({
               </nav>
             </SheetContent>
           </Sheet>
+          </div>
         </header>
 
         {/* Trial notice */}

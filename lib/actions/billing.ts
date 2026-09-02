@@ -136,6 +136,17 @@ export async function submitSubscriptionRequest(
     }).catch(() => {});
   }
 
+  await prisma.notification.create({
+    data: {
+      tenantId: ctx.tenantId,
+      type: 'UPGRADE_REQUEST',
+      severity: 'INFO',
+      title: `Upgrade request submitted`,
+      message: `We received your request to upgrade to ${plan.name}. We'll notify you once it's approved.`,
+      link: '/settings',
+    },
+  });
+
   return { ok: true, id: request.id };
 }
 

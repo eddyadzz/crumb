@@ -217,3 +217,34 @@ export function subscriptionRejectedEmailContent({
     ]
   );
 }
+
+export function notificationDigestEmailContent({
+  tenantName,
+  lines,
+}: {
+  tenantName: string;
+  lines: Array<{ severity: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'; text: string }>;
+}): EmailContent {
+  const subject = `Crumb update — ${lines.length} ${lines.length === 1 ? 'thing' : 'things'} to check for ${tenantName}`;
+  const rowsHtml = lines
+    .map(
+      (l) =>
+        `<tr><td style="padding:10px 12px;border-top:1px solid #e7e5e4;font-size:15px;color:#1c1917;">${
+          l.severity === 'ERROR'
+            ? '🔴'
+            : l.severity === 'WARNING'
+              ? '🟠'
+              : l.severity === 'SUCCESS'
+                ? '🟢'
+                : '🔵'
+        }&nbsp; ${l.text}</td></tr>`
+    )
+    .join('');
+  const table = `<table style="width:100%;border-collapse:collapse;margin:16px 0;"><tbody>${rowsHtml}</tbody></table>`;
+  return shell(
+    subject,
+    `Here's what's waiting for ${tenantName} in Crumb.`,
+    table + copy('Open Crumb to review these now — no further action is needed if everything looks good.'),
+    [`Crumb update for ${tenantName}:`].concat(lines.map((l) => `- ${l.text}`))
+  );
+}

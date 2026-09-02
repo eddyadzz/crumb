@@ -479,6 +479,23 @@ export async function adminReviewRequest(input: AdminReviewAction) {
     }
   });
 
+  // In-app notification for the tenant (inline billing event).
+  await prisma.notification.create({
+    data: {
+      tenantId: request.tenantId,
+      type: 'UPGRADE_REQUEST',
+      severity: input.status === 'APPROVED' ? 'SUCCESS' : 'ERROR',
+      title: input.status === 'APPROVED' ? `${request.requestedPlan.name} is now active` : `Upgrade to ${request.requestedPlan.name} declined`,
+      message:
+        input.status === 'APPROVED'
+          ? `Your subscription is active. All ${request.requestedPlan.name} features are unlocked.`
+          : reviewNotes
+            ? `Reason: ${reviewNotes}`
+            : 'Please check your payment and submit a new request.',
+      link: '/settings',
+    },
+  });
+
   // Notify the tenant owner (best-effort).
   const ownerEmail = request.tenant.email;
   if (ownerEmail) {

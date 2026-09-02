@@ -128,6 +128,19 @@ export async function completeProductionOrder(orderId: string) {
     data: { status: 'COMPLETED', completedAt: new Date() },
   });
 
+  await prisma.notification.create({
+    data: {
+      tenantId,
+      type: 'PRODUCTION',
+      severity: 'SUCCESS',
+      title: 'Production batch completed',
+      message: [
+        ...new Set(order.items.map((i) => i.recipe.name)),
+      ].join(', ') || 'A production batch was completed',
+      link: '/produce',
+    },
+  });
+
   revalidatePath('/produce');
   revalidatePath('/products');
   revalidatePath('/ingredients');

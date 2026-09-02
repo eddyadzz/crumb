@@ -9,6 +9,7 @@ import {
   subscriptionRequestReceivedEmailContent,
   subscriptionApprovedEmailContent,
   subscriptionRejectedEmailContent,
+  notificationDigestEmailContent,
   type EmailContent,
 } from './templates';
 
@@ -202,5 +203,20 @@ export async function sendSubscriptionRejectedEmail({
   await sendMail({
     to,
     content: subscriptionRejectedEmailContent({ tenantName, planName, reason }),
+  });
+}
+
+export async function sendNotificationDigestEmail({
+  to,
+  tenantName,
+  lines,
+}: {
+  to: string;
+  tenantName: string;
+  lines: Array<{ severity: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'; text: string }>;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: notificationDigestEmailContent({ tenantName, lines }),
   });
 }

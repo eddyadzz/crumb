@@ -35,6 +35,11 @@ import {
   type UpgradeRequestInfo,
 } from '@/lib/actions/billing';
 import { FEATURE_KEYS, FEATURE_LABELS } from '@/lib/plans';
+import {
+  getNotificationPrefs,
+  updateNotificationPrefs,
+  type NotificationPrefs,
+} from '@/lib/actions/notifications';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -56,19 +61,21 @@ export default function SettingsPage() {
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
   const [stockPolicy, setStockPolicyState] = useState<'WARN' | 'BLOCK' | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
 
   const refreshRequests = () =>
     getMyRequests().then(setRequests).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods(), getStockPolicy()])
-      .then(([info, planList, methods, policy]) => {
+    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods(), getStockPolicy(), getNotificationPrefs()])
+      .then(([info, planList, methods, policy, prefs]) => {
         if (cancelled) return;
         setAccount(info);
         setPlans(planList);
         setPaymentMethods(methods);
         setStockPolicyState(policy);
+        setNotifPrefs(prefs);
       })
       .catch(() => {});
     refreshRequests();
@@ -87,6 +94,15 @@ export default function SettingsPage() {
     await authClient.signOut();
     router.push('/sign-in');
     router.refresh();
+  };
+
+  const toggleNotifPref = (key: keyof NotificationPrefs, value: boolean) => {
+    setNotifPrefs((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, [key]: value };
+      updateNotificationPrefs(next).catch(() => {});
+      return next;
+    });
   };
 
   return (
@@ -559,35 +575,44 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Low Stock Alerts</p>
-              <p className="text-xs text-muted-foreground">
-                Get notified when ingredients run low
-              </p>
-            </div>
-            <Switch defaultChecked />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Choose which daily updates you receive as email. In-app
+            notifications in the bell always show regardless of these settings.
+          </p>
+          <NotifToggle
+            label="Low Stock Alerts"
+            description="Ingredients running below their reorder level"
+            checked={notifPrefs?.notifLowStockEmail ?? true}
+            onChange={(v) => toggleNotifPref('notifLowStockEmail', v)}
+          />
           <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Production Reminders</p>
-              <p className="text-xs text-muted-foreground">
-                Daily production plan reminders
-              </p>
-            </div>
-            <Switch defaultChecked />
-          </div>
+          <NotifToggle
+            label="Order Reminders"
+            description="Customer orders due today and tomorrow"
+            checked={notifPrefs?.notifOrdersEmail ?? true}
+            onChange={(v) => toggleNotifPref('notifOrdersEmail', v)}
+          />
           <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Daily Sales Summary</p>
-              <p className="text-xs text-muted-foreground">
-                End of day revenue report
-              </p>
-            </div>
-            <Switch />
-          </div>
+          <NotifToggle
+            label="Production Reminders"
+            description="Production batches scheduled for today"
+            checked={notifPrefs?.notifProductionEmail ?? true}
+            onChange={(v) => toggleNotifPref('notifProductionEmail', v)}
+          />
+          <Separator />
+          <NotifToggle
+            label="Billing &amp; Plan Updates"
+            description="Upgrade approvals, rejections and subscription notices"
+            checked={notifPrefs?.notifBillingEmail ?? true}
+            onChange={(v) => toggleNotifPref('notifBillingEmail', v)}
+          />
+          <Separator />
+          <NotifToggle
+            label="Trial Notices"
+            description="Trial reminders and when your trial ends"
+            checked={notifPrefs?.notifTrialEmail ?? true}
+            onChange={(v) => toggleNotifPref('notifTrialEmail', v)}
+          />
         </CardContent>
       </Card>
 
@@ -630,6 +655,28 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function NotifToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   );
 }

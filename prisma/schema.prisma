@@ -83,6 +83,23 @@ enum UserRole {
   STAFF
 }
 
+enum NotificationType {
+  LOW_STOCK
+  TRIAL
+  BILLING
+  UPGRADE_REQUEST
+  CUSTOMER_ORDER
+  PRODUCTION
+  SYSTEM
+}
+
+enum NotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
 model Tenant {
   id                   String                @id @default(cuid())
   name                 String
@@ -94,6 +111,11 @@ model Tenant {
   stockPolicy          StockPolicy           @default(WARN)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  notifLowStockEmail   Boolean               @default(true)
+  notifOrdersEmail     Boolean               @default(true)
+  notifProductionEmail Boolean               @default(true)
+  notifBillingEmail    Boolean               @default(true)
+  notifTrialEmail      Boolean               @default(true)
   users                User[]
   subscription         Subscription?
   subscriptionRequests SubscriptionRequest[]
@@ -104,6 +126,7 @@ model Tenant {
   sales                Sale[]
   customers            Customer[]
   customerOrders       CustomerOrder[]
+  notifications        Notification[]
 
   @@index([status])
 }
@@ -377,6 +400,24 @@ model CustomerOrderItem {
   unitPrice Float
 
   @@index([orderId])
+}
+
+model Notification {
+  id        String               @id @default(cuid())
+  tenantId  String
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type      NotificationType     @default(SYSTEM)
+  severity  NotificationSeverity @default(INFO)
+  title     String
+  message   String?
+  link      String?
+  read      Boolean              @default(false)
+  emailed   Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  readAt    DateTime?
+
+  @@index([tenantId, read])
+  @@index([tenantId, createdAt])
 }
 
 // --- Better Auth models ---
