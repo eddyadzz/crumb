@@ -6,6 +6,9 @@ import {
   trialReminderEmailContent,
   trialExpiredEmailContent,
   subscriptionActivatedEmailContent,
+  subscriptionRequestReceivedEmailContent,
+  subscriptionApprovedEmailContent,
+  subscriptionRejectedEmailContent,
 } from '@/lib/mail/templates';
 
 describe('trial lifecycle emails', () => {
@@ -82,5 +85,36 @@ describe('email templates', () => {
     });
     expect(subject).toContain('Business');
     expect(html).toContain('MVR 799.00/monthly');
+  });
+
+  it('request-received emails confirm receipt', () => {
+    const { subject, html } = subscriptionRequestReceivedEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Pro',
+    });
+    expect(subject).toContain('Pro');
+    expect(html).toContain('Sweet Crumbs Bakery');
+    expect(html).toContain('approve');
+  });
+
+  it('approved emails announce activation', () => {
+    const { subject, html } = subscriptionApprovedEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Business',
+    });
+    expect(subject).toContain('Business');
+    expect(html).toContain('is now active');
+    expect(html).toContain('Sweet Crumbs Bakery');
+  });
+
+  it('rejected emails carry the reviewer reason', () => {
+    const { subject, html } = subscriptionRejectedEmailContent({
+      tenantName: 'Sweet Crumbs Bakery',
+      planName: 'Pro',
+      reason: 'Reference number not found',
+    });
+    expect(subject).toContain('Pro');
+    expect(html).toContain('Sweet Crumbs Bakery');
+    expect(html).toContain('Reference number not found');
   });
 });

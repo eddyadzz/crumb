@@ -2,16 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Bell, Moon, Info, LogOut, Loader2, CreditCard, Check } from 'lucide-react';
+import {
+  User,
+  Bell,
+  Moon,
+  Info,
+  LogOut,
+  Loader2,
+  CreditCard,
+  Check,
+  UploadCloud,
+  ArrowUpRight,
+} from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { authClient } from '@/lib/auth-client';
 import { getAccountInfo, listPlans } from '@/lib/actions/tenant';
 import type { AccountInfo, PlanInfo } from '@/lib/actions/tenant';
+import {
+  listPaymentMethods,
+  submitSubscriptionRequest,
+  getMyRequests,
+  type PaymentMethodInfo,
+  type UpgradeRequestInfo,
+} from '@/lib/actions/billing';
 import { FEATURE_KEYS, FEATURE_LABELS } from '@/lib/plans';
 
 export default function SettingsPage() {
@@ -19,19 +40,38 @@ export default function SettingsPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([]);
+  const [requests, setRequests] = useState<UpgradeRequestInfo[]>([]);
+  const [upgradingPlan, setUpgradingPlan] = useState<PlanInfo | null>(null);
+  const [upgradeForm, setUpgradeForm] = useState({
+    paymentMethodId: '',
+    billingInterval: 'MONTHLY' as 'MONTHLY' | 'YEARLY',
+    referenceNumber: '',
+    notes: '',
+    proofImage: null as string | null,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
+
+  const refreshRequests = () =>
+    getMyRequests().then(setRequests).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getAccountInfo(), listPlans()])
-      .then(([info, planList]) => {
+    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods()])
+      .then(([info, planList, methods]) => {
         if (cancelled) return;
         setAccount(info);
         setPlans(planList);
+        setPaymentMethods(methods);
       })
       .catch(() => {});
+    refreshRequests();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const includedFeatures = account
@@ -178,10 +218,16 @@ export default function SettingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled
-                      title="Online payments are coming soon"
+                      onClick={() => {
+                        setUpgradingPlan(p);
+                        setPaymentMethods((m) => m);
+                        setUpgradeForm((f) => ({
+                          ...f,
+                          paymentMethodId: paymentMethods[0]?.id ?? '',
+                        }));
+                      }}
                     >
-                      Switch plan
+                      Upgrade
                     </Button>
                   )}
                 </div>
@@ -189,9 +235,260 @@ export default function SettingsPage() {
             })}
           </div>
           <p className="pt-1 text-xs text-muted-foreground">
-            Upgrades and downgrades at checkout are coming soon. Contact BoliFlow to
-            change plans today.
+            Pay manually via bank transfer or crypto. Our team reviews your payment
+            and activates your plan — usually within a few hours.
           </p>
+
+          {/* Upgrade request form */}
+          {upgradingPlan && (
+            <div className="rounded-xl border border-border bg-muted/30 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold">
+                  Upgrade to {upgradingPlan.name}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setUpgradingPlan(null);
+                    setUpgradeError(null);
+                    setUpgradeSuccess(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="billing-interval">Billing interval</Label>
+                  <select
+                    id="billing-interval"
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    value={upgradeForm.billingInterval}
+                    onChange={(e) =>
+                      setUpgradeForm((f) => ({
+                        ...f,
+                        billingInterval: e.target.value as 'MONTHLY' | 'YEARLY',
+                      }))
+                    }
+                  >
+                    <option value="MONTHLY">
+                      Monthly — MVR {upgradingPlan.monthlyPrice}/mo
+                    </option>
+                    <option value="YEARLY">
+                      Yearly — MVR {upgradingPlan.yearlyPrice}/yr
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="payment-method">Payment method</Label>
+                  <select
+                    id="payment-method"
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    value={upgradeForm.paymentMethodId}
+                    onChange={(e) =>
+                      setUpgradeForm((f) => ({
+                        ...f,
+                        paymentMethodId: e.target.value,
+                      }))
+                    }
+                  >
+                    {paymentMethods.length === 0 && (
+                      <option value="">No payment methods available</option>
+                    )}
+                    {paymentMethods.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                        {m.details ? ` — ${m.details}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="reference-number">
+                    Reference number / transaction ID
+                  </Label>
+                  <Input
+                    id="reference-number"
+                    className="mt-1"
+                    placeholder="e.g. transfer reference or TXID"
+                    value={upgradeForm.referenceNumber}
+                    onChange={(e) =>
+                      setUpgradeForm((f) => ({
+                        ...f,
+                        referenceNumber: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <Label>Payment proof (screenshot)</Label>
+                  {upgradeForm.proofImage ? (
+                    <div className="mt-1 overflow-hidden rounded-lg border border-border">
+                      <img
+                        src={upgradeForm.proofImage}
+                        alt="Proof of payment"
+                        className="max-h-40 w-full object-cover"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={() =>
+                          setUpgradeForm((f) => ({ ...f, proofImage: null }))
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <Label
+                      htmlFor="proof-upload"
+                      className="mt-1 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground hover:bg-muted/50"
+                    >
+                      <UploadCloud className="h-5 w-5" />
+                      <span>Click to upload a screenshot (max 6MB)</span>
+                      <input
+                        id="proof-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setUpgradeForm((f) => ({
+                              ...f,
+                              proofImage: reader.result as string,
+                            }));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </Label>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="request-notes">Notes (optional)</Label>
+                  <Textarea
+                    id="request-notes"
+                    className="mt-1"
+                    placeholder="Anything our team should know"
+                    value={upgradeForm.notes}
+                    onChange={(e) =>
+                      setUpgradeForm((f) => ({
+                        ...f,
+                        notes: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {upgradeError && (
+                  <p className="text-sm text-destructive">{upgradeError}</p>
+                )}
+                {upgradeSuccess && (
+                  <p className="text-sm text-emerald-600">{upgradeSuccess}</p>
+                )}
+
+                <Button
+                  className="w-full gap-2"
+                  disabled={submitting}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    setUpgradeError(null);
+                    setUpgradeSuccess(null);
+                    try {
+                      const res = await submitSubscriptionRequest({
+                        planId: upgradingPlan.id,
+                        paymentMethodId: upgradeForm.paymentMethodId,
+                        billingInterval: upgradeForm.billingInterval,
+                        referenceNumber: upgradeForm.referenceNumber,
+                        proofImage: upgradeForm.proofImage,
+                        notes: upgradeForm.notes,
+                      });
+                      if (res.ok) {
+                        setUpgradeSuccess(
+                          'Upgrade request submitted! We’ll review it and activate your plan shortly.'
+                        );
+                        setUpgradingPlan(null);
+                        setUpgradeForm({
+                          paymentMethodId: '',
+                          billingInterval: 'MONTHLY',
+                          referenceNumber: '',
+                          notes: '',
+                          proofImage: null,
+                        });
+                        refreshRequests();
+                      } else {
+                        setUpgradeError(res.error);
+                      }
+                    } catch {
+                      setUpgradeError(
+                        'Something went wrong. Please try again or contact BoliFlow.'
+                      );
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                >
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUpRight className="h-4 w-4" />
+                  )}
+                  Submit upgrade request
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* My upgrade requests */}
+          {requests.length > 0 && (
+            <div className="rounded-xl border border-border p-4">
+              <p className="mb-2 text-sm font-semibold">Your upgrade requests</p>
+              <div className="divide-y divide-border">
+                {requests.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {r.planName} · {r.billingInterval === 'YEARLY' ? 'Yearly' : 'Monthly'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Ref: {r.referenceNumber} ·{' '}
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </p>
+                      {r.reviewNotes && (
+                        <p className="text-xs text-muted-foreground">
+                          Note: {r.reviewNotes}
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      variant={
+                        r.status === 'APPROVED'
+                          ? 'default'
+                          : r.status === 'REJECTED'
+                            ? 'destructive'
+                            : 'secondary'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

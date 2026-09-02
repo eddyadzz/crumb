@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -47,11 +48,17 @@ import {
   adminCreateTenant,
   adminSetPlan,
   adminExtendTrial,
+  adminGetRequest,
+  adminReviewRequest,
+  adminSavePaymentMethod,
+  adminTogglePaymentMethod,
 } from '@/lib/actions/admin';
 import type {
   adminGetDashboard,
   adminListTenants,
   adminGetBilling,
+  adminListRequests,
+  adminListPaymentMethods,
   AdminSubscriptionStatus,
 } from '@/lib/actions/admin';
 
@@ -73,10 +80,14 @@ export function AdminClient({
   stats,
   tenants,
   billing,
+  requests,
+  paymentMethods,
 }: {
   stats: Awaited<ReturnType<typeof adminGetDashboard>>;
   tenants: Awaited<ReturnType<typeof adminListTenants>>;
   billing: BillingData;
+  requests: Awaited<ReturnType<typeof adminListRequests>>;
+  paymentMethods: Awaited<ReturnType<typeof adminListPaymentMethods>>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<'overview' | 'billing'>('overview');
@@ -92,6 +103,70 @@ export function AdminClient({
     Record<string, { planId: string; status: string }>
   >({});
   const [rowBusy, setRowBusy] = useState<Record<string, string | null>>({});
+
+  // Upgrade requests review
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewReqId, setReviewReqId] = useState<string | null>(null);
+  const [reviewDetail, setReviewDetail] = useState<Awaited<
+    ReturnType<typeof adminGetRequest>
+  > | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+
+  const openReview = (id: string) => {
+    setReviewReqId(id);
+    setReviewNotes('');
+    adminGetRequest(id).then(setReviewDetail).catch(() => setReviewDetail(null));
+    setReviewOpen(true);
+  };
+
+  const submitReview = async (status: 'APPROVED' | 'REJECTED') => {
+    if (!reviewReqId) return;
+    setReviewing(true);
+    setError(null);
+    try {
+      await adminReviewRequest({
+        requestId: reviewReqId,
+        status,
+        reviewNotes: reviewNotes || undefined,
+      });
+      setReviewOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to review request');
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  // Payment methods management
+  const [pmName, setPmName] = useState('');
+  const [pmCode, setPmCode] = useState('');
+  const [pmDetails, setPmDetails] = useState('');
+  const [pmCurrency, setPmCurrency] = useState('');
+  const [savingPm, setSavingPm] = useState(false);
+
+  const savePaymentMethod = async () => {
+    setSavingPm(true);
+    setError(null);
+    try {
+      await adminSavePaymentMethod({
+        name: pmName,
+        code: pmCode,
+        details: pmDetails,
+        currency: pmCurrency,
+      });
+      setPmName('');
+      setPmCode('');
+      setPmDetails('');
+      setPmCurrency('');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save payment method');
+    } finally {
+      setSavingPm(false);
+    }
+  };
 
   const toggleStatus = async (id: string, current: string) => {
     setBusyId(id);
@@ -544,7 +619,321 @@ export function AdminClient({
               </Table>
             </CardContent>
           </Card>
+
+          {/* Upgrade requests */}
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-base">Upgrade Requests</CardTitle>
+              <Badge variant="secondary">{requests.length}</Badge>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Requested plan</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Review</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        No upgrade requests yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {requests.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <p className="font-medium">{r.tenantName}</p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={r.planCode === 'free' ? 'secondary' : 'default'}>
+                          {r.planName}
+                        </Badge>
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {r.billingInterval.toLowerCase()}
+                        </span>
+                      </TableCell>
+                      <TableCell>{r.paymentMethodName}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.referenceNumber}
+                        {r.hasProof && <span className="ml-1 text-emerald-600">· proof</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            r.status === 'APPROVED'
+                              ? 'default'
+                              : r.status === 'REJECTED'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
+                          {r.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatDateTime(r.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {r.status === 'PENDING' ? (
+                          <Button size="sm" onClick={() => openReview(r.id)}>
+                            Review
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => openReview(r.id)}>
+                            View
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Payment methods */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Payment Methods</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <Label htmlFor="pm-name">Name</Label>
+                  <Input
+                    id="pm-name"
+                    className="mt-1"
+                    placeholder="USDT (TRC20)"
+                    value={pmName}
+                    onChange={(e) => setPmName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pm-code">Code</Label>
+                  <Input
+                    id="pm-code"
+                    className="mt-1"
+                    placeholder="USDT_TRC20"
+                    value={pmCode}
+                    onChange={(e) => setPmCode(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pm-details">Details</Label>
+                  <Input
+                    id="pm-details"
+                    className="mt-1"
+                    placeholder="Wallet / account info"
+                    value={pmDetails}
+                    onChange={(e) => setPmDetails(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pm-currency">Currency</Label>
+                  <Input
+                    id="pm-currency"
+                    className="mt-1"
+                    placeholder="USDT"
+                    value={pmCurrency}
+                    onChange={(e) => setPmCurrency(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={savingPm || !pmName.trim() || !pmCode.trim()}
+                  onClick={savePaymentMethod}
+                >
+                  {savingPm ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : null}
+                  Add payment method
+                </Button>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {paymentMethods.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between rounded-xl border border-border p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.code}
+                        {m.currency ? ` · ${m.currency}` : ''}
+                      </p>
+                      {m.details && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {m.details}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={m.active ? 'default' : 'secondary'}>
+                        {m.active ? 'Active' : 'Off'}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          await adminTogglePaymentMethod(m.id);
+                          router.refresh();
+                        }}
+                      >
+                        Toggle
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </>
+      )}
+
+      {/* Review upgrade request modal */}
+      {reviewOpen && reviewDetail && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setReviewOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-background p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold">
+                Review upgrade request
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReviewOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
+
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Tenant</dt>
+                <dd className="text-right font-medium">
+                  {reviewDetail.tenant.name}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Requested plan</dt>
+                <dd className="text-right font-medium">
+                  {reviewDetail.requestedPlan.name}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Interval</dt>
+                <dd className="text-right">
+                  {reviewDetail.billingInterval === 'YEARLY' ? 'Yearly' : 'Monthly'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Payment method</dt>
+                <dd className="text-right">
+                  {reviewDetail.paymentMethod.name}
+                  {reviewDetail.paymentMethod.details
+                    ? ` — ${reviewDetail.paymentMethod.details}`
+                    : ''}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Reference</dt>
+                <dd className="text-right font-medium">
+                  {reviewDetail.referenceNumber}
+                </dd>
+              </div>
+              {reviewDetail.notes && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Notes</dt>
+                  <dd className="text-right">{reviewDetail.notes}</dd>
+                </div>
+              )}
+            </dl>
+
+            {reviewDetail.proofImage && (
+              <div className="mt-3">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Payment proof
+                </p>
+                <img
+                  src={reviewDetail.proofImage}
+                  alt="Payment proof"
+                  className="max-h-56 w-full rounded-xl border border-border object-contain"
+                />
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Label htmlFor="review-notes">Review notes</Label>
+              <Textarea
+                id="review-notes"
+                className="mt-1"
+                placeholder={
+                  reviewDetail.status === 'REJECTED'
+                    ? 'Reason for rejection (sent to tenant)'
+                    : 'Optional note'
+                }
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+              />
+            </div>
+
+            {reviewDetail.status !== 'PENDING' && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                This request was already {reviewDetail.status.toLowerCase()} on{' '}
+                {reviewDetail.reviewedAt
+                  ? formatDateTime(reviewDetail.reviewedAt)
+                  : '—'}
+                .
+              </p>
+            )}
+
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              {reviewDetail.status === 'PENDING' ? (
+                <>
+                  <Button
+                    variant="outline"
+                    disabled={reviewing}
+                    onClick={() => submitReview('REJECTED')}
+                  >
+                    Reject
+                  </Button>
+                  <Button disabled={reviewing} onClick={() => submitReview('APPROVED')}>
+                    {reviewing ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : null}
+                    Approve &amp; activate
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => setReviewOpen(false)}>
+                  Done
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

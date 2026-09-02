@@ -6,6 +6,9 @@ import {
   trialReminderEmailContent,
   trialExpiredEmailContent,
   subscriptionActivatedEmailContent,
+  subscriptionRequestReceivedEmailContent,
+  subscriptionApprovedEmailContent,
+  subscriptionRejectedEmailContent,
   type EmailContent,
 } from './templates';
 
@@ -152,5 +155,52 @@ export async function sendSubscriptionActivatedEmail({
   await sendMail({
     to,
     content: subscriptionActivatedEmailContent({ tenantName, planName, amount, interval }),
+  });
+}
+
+export async function sendSubscriptionRequestReceivedEmail({
+  to,
+  tenantName,
+  planName,
+}: {
+  to: string;
+  tenantName: string;
+  planName: string;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: subscriptionRequestReceivedEmailContent({ tenantName, planName }),
+  });
+}
+
+export async function sendSubscriptionApprovedEmail({
+  to,
+  tenantName,
+  planName,
+}: {
+  to: string;
+  tenantName: string;
+  planName: string;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: subscriptionApprovedEmailContent({ tenantName, planName }),
+  });
+}
+
+export async function sendSubscriptionRejectedEmail({
+  to,
+  tenantName,
+  planName,
+  reason,
+}: {
+  to: string;
+  tenantName: string;
+  planName: string;
+  reason?: string | null;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: subscriptionRejectedEmailContent({ tenantName, planName, reason }),
   });
 }

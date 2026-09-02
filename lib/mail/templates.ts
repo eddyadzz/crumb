@@ -155,3 +155,65 @@ export function trialExpiredEmailContent({
     ]
   );
 }
+
+export function subscriptionRequestReceivedEmailContent({
+  tenantName,
+  planName,
+}: {
+  tenantName: string;
+  planName: string;
+}): EmailContent {
+  const subject = `We received your ${planName} upgrade request for ${tenantName}`;
+  return shell(
+    subject,
+    `We've received your request to upgrade ${tenantName} to ${planName}.`,
+    copy(`Our team will review your payment and activate your subscription shortly. You'll get an email once it's approved — usually within a few hours during business hours.`),
+    [
+      `We received your ${planName} upgrade request for ${tenantName}.`,
+      'Our team will review your payment and activate your subscription shortly.',
+    ]
+  );
+}
+
+export function subscriptionApprovedEmailContent({
+  tenantName,
+  planName,
+}: {
+  tenantName: string;
+  planName: string;
+}): EmailContent {
+  const subject = `Your ${planName} subscription for ${tenantName} is now active`;
+  return shell(
+    subject,
+    `Great news — your ${planName} subscription for ${tenantName} is now active.`,
+    copy(`All ${planName} features are unlocked. Thank you for upgrading to Crumb. You can close this email — no further action needed.`),
+    [
+      `Your ${planName} subscription for ${tenantName} is now active.`,
+      'All ' + planName + ' features are unlocked. Thanks for choosing Crumb.',
+    ]
+  );
+}
+
+export function subscriptionRejectedEmailContent({
+  tenantName,
+  planName,
+  reason,
+}: {
+  tenantName: string;
+  planName: string;
+  reason?: string | null;
+}): EmailContent {
+  const subject = `We couldn't process your ${planName} upgrade for ${tenantName}`;
+  return shell(
+    subject,
+    `We couldn't approve your ${planName} upgrade for ${tenantName}.`,
+    reason
+      ? copy(`Reason: ${reason}. Please double-check your payment and submit a new upgrade request.`)
+      : copy(`Please double-check your payment and submit a new upgrade request, or contact us for help.`),
+    [
+      `We couldn't approve your ${planName} upgrade for ${tenantName}.`,
+      reason ? `Reason: ${reason}` : 'Please check your payment and submit a new request.',
+      'Your workspace and data are unchanged.',
+    ]
+  );
+}

@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requirePlatformAdmin } from '@/lib/admin';
 import { slugify } from '@/lib/slug';
-import { sendSubscriptionActivatedEmail, sendWelcomeEmail } from '@/lib/mail';
+import {
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionApprovedEmail,
+  sendSubscriptionRejectedEmail,
+  sendWelcomeEmail,
+} from '@/lib/mail';
 
 export async function adminGetDashboard() {
   await requirePlatformAdmin();
@@ -360,4 +365,199 @@ export async function adminExtendTrial(input: { tenantId: string; days: number }
 
   revalidatePath('/admin');
   return { tenantId: input.tenantId, trialEndsAt };
+}
+
+export interface AdminSubscriptionRequestRow {
+  id: string;
+  tenantName: string;
+  tenantId: string;
+  planName: string;
+  planCode: string;
+  paymentMethodName: string;
+  billingInterval: string;
+  referenceNumber: string;
+  hasProof: boolean;
+  notes: string | null;
+  status: string;
+  createdAt: string;
+  reviewNotes: string | null;
+}
+
+export async function adminListRequests(): Promise<AdminSubscriptionRequestRow[]> {
+  await requirePlatformAdmin();
+  const requests = await prisma.subscriptionRequest.findMany({
+    include: {
+      tenant: { select: { name: true, id: true } },
+      requestedPlan: { select: { name: true, code: true } },
+      paymentMethod: { select: { name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+  return requests.map((r) => ({
+    id: r.id,
+    tenantName: r.tenant.name,
+    tenantId: r.tenant.id,
+    planName: r.requestedPlan.name,
+    planCode: r.requestedPlan.code,
+    paymentMethodName: r.paymentMethod.name,
+    billingInterval: r.billingInterval,
+    referenceNumber: r.referenceNumber,
+    hasProof: Boolean(r.proofImage),
+    notes: r.notes,
+    status: r.status,
+    createdAt: r.createdAt.toISOString(),
+    reviewNotes: r.reviewNotes,
+  }));
+}
+
+/** Detail (including the base64 proof) for a single request, for viewing in the modal. */
+export async function adminGetRequest(requestId: string) {
+  await requirePlatformAdmin();
+  const req = await prisma.subscriptionRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      tenant: { select: { name: true, email: true } },
+      requestedPlan: { select: { name: true, code: true } },
+      paymentMethod: { select: { name: true, code: true, details: true } },
+    },
+  });
+  return req;
+}
+
+export type AdminReviewAction = {
+  requestId: string;
+  status: 'APPROVED' | 'REJECTED';
+  reviewNotes?: string;
+};
+
+export async function adminReviewRequest(input: AdminReviewAction) {
+  const admin = await requirePlatformAdmin();
+
+  const request = await prisma.subscriptionRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      tenant: { select: { name: true, email: true } },
+      requestedPlan: { select: { id: true, name: true, code: true } },
+    },
+  });
+  if (!request) throw new Error('Request not found');
+  if (request.status !== 'PENDING') return { id: request.id, already: request.status };
+
+  const now = new Date();
+  const periodMs = request.billingInterval === 'YEARLY' ? 365 : 30;
+  const endsAt = new Date(now.getTime() + periodMs * 24 * 60 * 60 * 1000);
+  const reviewNotes = input.reviewNotes?.trim() || null;
+  const reviewerId = admin.id;
+
+  await prisma.$transaction(async (tx) => {
+    if (input.status === 'APPROVED') {
+      // Activate the subscription on the requested plan.
+      await tx.subscription.update({
+        where: { tenantId: request.tenantId },
+        data: {
+          planId: request.requestedPlan.id,
+          status: 'ACTIVE',
+          billingInterval: request.billingInterval,
+          startsAt: now,
+          endsAt,
+          trialEndsAt: null,
+          trialStartedAt: null,
+          trialEmailSentFor: null,
+          autoRenew: true,
+        },
+      });
+      await tx.subscriptionRequest.update({
+        where: { id: request.id },
+        data: { status: 'APPROVED', reviewedAt: now, reviewedBy: reviewerId, reviewNotes },
+      });
+    } else {
+      await tx.subscriptionRequest.update({
+        where: { id: request.id },
+        data: { status: 'REJECTED', reviewedAt: now, reviewedBy: reviewerId, reviewNotes },
+      });
+    }
+  });
+
+  // Notify the tenant owner (best-effort).
+  const ownerEmail = request.tenant.email;
+  if (ownerEmail) {
+    if (input.status === 'APPROVED') {
+      await sendSubscriptionApprovedEmail({
+        to: ownerEmail,
+        tenantName: request.tenant.name,
+        planName: request.requestedPlan.name,
+      }).catch(() => {});
+    } else {
+      await sendSubscriptionRejectedEmail({
+        to: ownerEmail,
+        tenantName: request.tenant.name,
+        planName: request.requestedPlan.name,
+        reason: reviewNotes,
+      }).catch(() => {});
+    }
+  }
+
+  revalidatePath('/admin');
+  return { id: request.id, status: input.status };
+}
+
+export interface AdminPaymentMethodRow {
+  id: string;
+  name: string;
+  code: string;
+  details: string | null;
+  currency: string | null;
+  active: boolean;
+  sortOrder: number;
+}
+
+export async function adminListPaymentMethods(): Promise<AdminPaymentMethodRow[]> {
+  await requirePlatformAdmin();
+  const methods = await prisma.paymentMethod.findMany({
+    orderBy: { sortOrder: 'asc' },
+  });
+  return methods.map((m) => ({
+    id: m.id,
+    name: m.name,
+    code: m.code,
+    details: m.details,
+    currency: m.currency,
+    active: m.active,
+    sortOrder: m.sortOrder,
+  }));
+}
+
+export async function adminSavePaymentMethod(input: {
+  id?: string;
+  name: string;
+  code: string;
+  details?: string | null;
+  currency?: string | null;
+  active?: boolean;
+}) {
+  await requirePlatformAdmin();
+  const name = input.name.trim();
+  const code = input.code.trim().toUpperCase().replace(/\s+/g, '_');
+  if (!name || !code) throw new Error('Name and code are required');
+
+  if (input.id) {
+    return prisma.paymentMethod.update({
+      where: { id: input.id },
+      data: { name, code, details: input.details || null, currency: input.currency || null, active: input.active ?? true },
+    });
+  }
+  return prisma.paymentMethod.create({
+    data: { name, code, details: input.details || null, currency: input.currency || null, active: input.active ?? true },
+  });
+}
+
+export async function adminTogglePaymentMethod(id: string) {
+  await requirePlatformAdmin();
+  const m = await prisma.paymentMethod.findUnique({ where: { id } });
+  if (!m) throw new Error('Payment method not found');
+  return prisma.paymentMethod.update({
+    where: { id },
+    data: { active: !m.active },
+  });
 }
