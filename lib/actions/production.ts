@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
 import { convertToBase } from '@/lib/costing';
+import { blockForShortage } from '@/lib/stock';
 
 export interface CreateProductionOrderInput {
   items: { recipeId: string; batchCount: number }[];
@@ -68,6 +69,26 @@ export async function completeProductionOrder(orderId: string) {
     },
   });
   if (!order) throw new Error('Order not found');
+
+  // Stock policy: with BLOCK, refuse to complete when any ingredient is short.
+  const [tenant] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { stockPolicy: true } }),
+  ]);
+  const requirements = order.items.flatMap((item) =>
+    item.recipe.recipeIngredients.map((ri) => ({
+      requiredBase: convertToBase(ri.quantity, ri.unit) * item.batchCount,
+      availableBase: ri.ingredient.availableQuantity,
+    }))
+  );
+  const { blocked, shortages } = blockForShortage(
+    tenant?.stockPolicy ?? 'WARN',
+    requirements
+  );
+  if (blocked) {
+    throw new Error(
+      `Cannot complete production — ${shortages} ingredient(s) are below required stock (stock policy is set to Block).`
+    );
+  }
 
   // Deduct ingredients & log PRODUCTION movements
   for (const item of order.items) {

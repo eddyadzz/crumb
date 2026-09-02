@@ -63,6 +63,20 @@ enum SubscriptionRequestStatus {
   REJECTED
 }
 
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_PRODUCTION
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum StockPolicy {
+  WARN
+  BLOCK
+}
+
 enum UserRole {
   OWNER
   MANAGER
@@ -77,6 +91,7 @@ model Tenant {
   phone                String?
   country              String?
   status               TenantStatus          @default(ACTIVE)
+  stockPolicy          StockPolicy           @default(WARN)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   users                User[]
@@ -87,6 +102,8 @@ model Tenant {
   products             Product[]
   productionOrders     ProductionOrder[]
   sales                Sale[]
+  customers            Customer[]
+  customerOrders       CustomerOrder[]
 
   @@index([status])
 }
@@ -262,17 +279,18 @@ model ProductionItem {
 }
 
 model Product {
-  id                String            @id @default(cuid())
-  tenantId          String
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  recipeId          String
-  recipe            Recipe            @relation(fields: [recipeId], references: [id])
-  name              String
-  sellingPrice      Float
-  availableQuantity Int
-  type              ProductType
-  movements         ProductMovement[]
-  saleItems         SaleItem[]
+  id                 String              @id @default(cuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipeId           String
+  recipe             Recipe              @relation(fields: [recipeId], references: [id])
+  name               String
+  sellingPrice       Float
+  availableQuantity  Int
+  type               ProductType
+  movements          ProductMovement[]
+  saleItems          SaleItem[]
+  customerOrderItems CustomerOrderItem[]
 
   @@index([tenantId])
   @@index([recipeId])
@@ -312,6 +330,53 @@ model SaleItem {
   unitPrice Float
 
   @@index([saleId])
+}
+
+model Customer {
+  id        String          @id @default(cuid())
+  tenantId  String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  orders    CustomerOrder[]
+
+  @@index([tenantId])
+}
+
+model CustomerOrder {
+  id           String              @id @default(cuid())
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId   String?
+  customer     Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status       OrderStatus         @default(PENDING)
+  deliveryDate DateTime?
+  deliveryTime String?
+  notes        String?
+  totalAmount  Float               @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  items        CustomerOrderItem[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([customerId])
+}
+
+model CustomerOrderItem {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product       @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+
+  @@index([orderId])
 }
 
 // --- Better Auth models ---
