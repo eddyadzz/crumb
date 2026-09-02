@@ -178,60 +178,33 @@ export type RecentActivityRow = {
 export async function saasGetRecentActivity(take = 15): Promise<RecentActivityRow[]> {
   await requirePlatformAdmin();
 
-  const [tenants, requests, trials] = await Promise.all([
-    prisma.tenant.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
-    prisma.subscriptionRequest.findMany({
-      where: { status: { in: ['APPROVED', 'REJECTED'] } },
-      include: { tenant: { select: { name: true } }, requestedPlan: { select: { name: true } } },
-      orderBy: { reviewedAt: 'desc' },
-      take: 10,
-    }),
-    prisma.subscription.findMany({
-      where: { status: 'TRIAL' },
-      include: { tenant: { select: { name: true } } },
-      orderBy: { trialEndsAt: 'asc' },
-      take: 10,
-    }),
-  ]);
+  const events = await prisma.activityEvent.findMany({
+    include: { tenant: { select: { name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take,
+  });
 
-  const now = Date.now();
-
-  const rows: RecentActivityRow[] = [];
-
-  for (const t of tenants) {
-    rows.push({
-      id: `t-${t.id}`,
-      kind: 'tenant',
-      title: 'New tenant created',
-      detail: t.name,
-      at: t.createdAt.toISOString(),
-    });
-  }
-
-  for (const r of requests) {
-    rows.push({
-      id: `r-${r.id}`,
-      kind: 'upgrade',
-      title: `Upgrade ${r.status.toLowerCase()}`,
-      detail: `${r.tenant.name} → ${r.requestedPlan.name}`,
-      at: r.reviewedAt?.toISOString() ?? r.createdAt.toISOString(),
-    });
-  }
-
-  for (const s of trials) {
-    if (!s.trialEndsAt) continue;
-    const diff = s.trialEndsAt.getTime() - now;
-    const expired = diff <= 0;
-    rows.push({
-      id: `trial-${s.id}`,
-      kind: 'trial',
-      title: expired ? 'Trial expired' : 'Trial ending',
-      detail: `${s.tenant.name} · ${s.trialEndsAt.toLocaleDateString()}`,
-      at: s.trialEndsAt.toISOString(),
-    });
-  }
-
-  return rows
-    .sort((a, b) => (a.at > b.at ? -1 : a.at < b.at ? 1 : 0))
-    .slice(0, take);
+  return events.map((e) => ({
+    id: e.id,
+    kind: ACTIVITY_KIND[e.type] ?? 'system',
+    title: e.title,
+    detail: e.tenant.name + (e.actorName ? ` · ${e.actorName}` : ''),
+    at: e.createdAt.toISOString(),
+  }));
 }
+
+const ACTIVITY_KIND: Record<string, string> = {
+  ORDER_CREATED: 'order',
+  ORDER_CONFIRMED: 'order',
+  ORDER_CANCELLED: 'order',
+  PRODUCTION_CREATED: 'production',
+  PRODUCTION_COMPLETED: 'production',
+  PRODUCTION_CANCELLED: 'production',
+  SALE_COMPLETED: 'sale',
+  UPGRADE_REQUESTED: 'upgrade',
+  UPGRADE_APPROVED: 'upgrade',
+  UPGRADE_REJECTED: 'upgrade',
+  USER_INVITED: 'user',
+  USER_REMOVED: 'user',
+  SYSTEM: 'system',
+};

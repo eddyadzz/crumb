@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
 import { convertToBase } from '@/lib/costing';
 import { blockForShortage } from '@/lib/stock';
+import { recordActivity } from '@/lib/activity';
 
 export interface CreateProductionOrderInput {
   items: { recipeId: string; batchCount: number }[];
@@ -35,6 +36,13 @@ export async function createProductionOrder(input: CreateProductionOrderInput) {
     },
     include: { items: true },
   });
+  await recordActivity({
+    tenantId,
+    type: 'PRODUCTION_CREATED',
+    title: 'Production batch planned',
+    entityType: 'ProductionOrder',
+    entityId: order.id,
+  });
   revalidatePath('/produce');
   revalidatePath('/products');
   revalidatePath('/');
@@ -46,6 +54,13 @@ export async function startProductionOrder(orderId: string) {
   await prisma.productionOrder.update({
     where: { id: orderId, tenantId },
     data: { status: 'IN_PROGRESS' },
+  });
+  await recordActivity({
+    tenantId,
+    type: 'PRODUCTION_CREATED',
+    title: 'Production started',
+    entityType: 'ProductionOrder',
+    entityId: orderId,
   });
   revalidatePath('/produce');
   return true;
@@ -141,6 +156,15 @@ export async function completeProductionOrder(orderId: string) {
     },
   });
 
+  await recordActivity({
+    tenantId,
+    type: 'PRODUCTION_COMPLETED',
+    title: 'Completed production batch',
+    description: [...new Set(order.items.map((i) => `${i.batchCount}× ${i.recipe.name}`))].join(', '),
+    entityType: 'ProductionOrder',
+    entityId: orderId,
+  });
+
   revalidatePath('/produce');
   revalidatePath('/products');
   revalidatePath('/ingredients');
@@ -153,6 +177,13 @@ export async function cancelProductionOrder(orderId: string) {
   await prisma.productionOrder.update({
     where: { id: orderId, tenantId },
     data: { status: 'CANCELLED' },
+  });
+  await recordActivity({
+    tenantId,
+    type: 'PRODUCTION_CANCELLED',
+    title: 'Production batch cancelled',
+    entityType: 'ProductionOrder',
+    entityId: orderId,
   });
   revalidatePath('/produce');
   return true;

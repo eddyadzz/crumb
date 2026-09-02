@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireTenant } from '@/lib/tenant';
 import { resolvePlanFeatures, type PlanFeatures } from '@/lib/plans';
 import { sendSubscriptionRequestReceivedEmail } from '@/lib/mail';
+import { recordActivity } from '@/lib/activity';
 
 export interface PaymentMethodInfo {
   id: string;
@@ -121,6 +122,15 @@ export async function submitSubscriptionRequest(
       notes: input.notes?.trim() || null,
       status: 'PENDING',
     },
+  });
+
+  await recordActivity({
+    tenantId: ctx.tenantId,
+    type: 'UPGRADE_REQUESTED',
+    title: `Requested ${plan.name} upgrade`,
+    description: `${method.name} · ${input.billingInterval.toLowerCase()}`,
+    entityType: 'SubscriptionRequest',
+    entityId: request.id,
   });
 
   // Best-effort notification; the request is already saved.

@@ -10,6 +10,7 @@ import {
   ChefHat,
   ShoppingCart,
   ClipboardList,
+  Activity,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -20,6 +21,7 @@ import { prisma } from '@/lib/prisma';
 import { formatMVR, formatBaseQuantity } from '@/lib/costing';
 import { recipeCostPerServing } from '@/lib/queries';
 import { aggregateBatches, forecastRequirements, forecastSummary } from '@/lib/forecast';
+import { listRecentActivity } from '@/lib/actions/activity';
 import { getTenantContext } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +31,7 @@ export default async function DashboardPage() {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders] = await Promise.all([
+  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders, recentActivity] = await Promise.all([
     prisma.sale.findMany({
       where: { tenantId, createdAt: { gte: startOfToday } },
       include: {
@@ -91,6 +93,7 @@ export default async function DashboardPage() {
         },
       },
     }),
+    listRecentActivity(5),
   ]);
 
   // Sales with cost
@@ -301,6 +304,50 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              Recent Activity
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/activity">
+                View all
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentActivity.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No activity yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentActivity.map((e) => (
+                  <li key={e.id} className="flex items-start gap-3 px-4 py-2.5">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary/60" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm">{e.title}</p>
+                      {e.description && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {e.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {new Date(e.createdAt).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
       {todaysOrders.length > 0 && (
         <Card>

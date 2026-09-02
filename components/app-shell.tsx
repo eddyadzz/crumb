@@ -18,6 +18,7 @@ import {
   CalendarDays,
   CalendarRange,
   Bell,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -29,6 +30,7 @@ import { useState } from 'react';
 const mainNav = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/recipes', label: 'Recipes', icon: ChefHat },
   { href: '/produce', label: 'Produce', icon: Factory },
   { href: '/sell', label: 'Sell', icon: ShoppingCart },

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { orderTotal, canTransition, planFromOrderLines } from '@/lib/orders';
+import { recordActivity } from '@/lib/activity';
 import type { OrderStatus } from '@prisma/client';
 
 export const ORDER_STATUSES: OrderStatus[] = [
@@ -131,6 +132,16 @@ export async function createOrder(input: CreateOrderInput) {
     })),
   };
 
+  const itemsLabel = vm.items.map((i) => `${i.quantity}× ${i.productName}`).join(', ');
+  await recordActivity({
+    tenantId,
+    type: 'ORDER_CREATED',
+    title: `Created order for ${itemsLabel}`,
+    description: vm.customerName ? `For ${vm.customerName}` : null,
+    entityType: 'CustomerOrder',
+    entityId: vm.id,
+  });
+
   revalidatePath('/orders');
   revalidatePath('/');
   return vm;
@@ -151,6 +162,25 @@ export async function setOrderStatus(orderId: string, to: OrderStatus) {
     where: { id: orderId },
     data: { status: to },
   });
+
+  if (to === 'CONFIRMED') {
+    await recordActivity({
+      tenantId,
+      type: 'ORDER_CONFIRMED',
+      title: 'Order confirmed',
+      entityType: 'CustomerOrder',
+      entityId: orderId,
+    });
+  } else if (to === 'CANCELLED') {
+    await recordActivity({
+      tenantId,
+      type: 'ORDER_CANCELLED',
+      title: 'Order cancelled',
+      entityType: 'CustomerOrder',
+      entityId: orderId,
+    });
+  }
+
   revalidatePath('/orders');
   revalidatePath('/');
   return updated;

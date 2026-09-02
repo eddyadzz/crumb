@@ -9,6 +9,9 @@ import {
   Briefcase,
   CheckCircle2,
   XCircle,
+  Factory,
+  ShoppingCart,
+  ClipboardList,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -263,12 +266,18 @@ function Stat({
 function ActivityIcon({ kind }: { kind: string }) {
   const cls = 'mt-0.5 h-4 w-4 shrink-0';
   switch (kind) {
-    case 'tenant':
-      return <Building2 className={`${cls} text-primary`} />;
+    case 'order':
+      return <ClipboardList className={`${cls} text-primary`} />;
+    case 'production':
+      return <Factory className={`${cls} text-amber-600`} />;
+    case 'sale':
+      return <ShoppingCart className={`${cls} text-emerald-600`} />;
     case 'upgrade':
-      return <Briefcase className={`${cls} text-emerald-600`} />;
-    case 'trial':
-      return <Clock className={`${cls} text-amber-600`} />;
+      return <Briefcase className={`${cls} text-sky-600`} />;
+    case 'user':
+      return <Users className={`${cls} text-muted-foreground`} />;
+    case 'system':
+      return <Activity className={`${cls} text-muted-foreground`} />;
     default:
       return <Activity className={`${cls} text-muted-foreground`} />;
   }

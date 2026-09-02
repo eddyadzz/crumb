@@ -10,6 +10,7 @@ import {
   sendSubscriptionRejectedEmail,
   sendWelcomeEmail,
 } from '@/lib/mail';
+import { recordActivity } from '@/lib/activity';
 
 export async function adminGetDashboard() {
   await requirePlatformAdmin();
@@ -494,6 +495,15 @@ export async function adminReviewRequest(input: AdminReviewAction) {
             : 'Please check your payment and submit a new request.',
       link: '/settings',
     },
+  });
+
+  await recordActivity({
+    tenantId: request.tenantId,
+    type: input.status === 'APPROVED' ? 'UPGRADE_APPROVED' : 'UPGRADE_REJECTED',
+    title: input.status === 'APPROVED' ? `${request.requestedPlan.name} upgrade approved` : `${request.requestedPlan.name} upgrade rejected`,
+    description: reviewNotes ?? null,
+    entityType: 'SubscriptionRequest',
+    entityId: request.id,
   });
 
   // Notify the tenant owner (best-effort).

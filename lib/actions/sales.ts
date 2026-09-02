@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
+import { recordActivity } from '@/lib/activity';
 
 export interface SaleLineItem {
   productId: string;
@@ -51,6 +52,15 @@ export async function processSale(input: { items: SaleLineItem[] }) {
       data: { productId: item.productId, type: 'SOLD', quantity: item.quantity },
     });
   }
+
+  await recordActivity({
+    tenantId,
+    type: 'SALE_COMPLETED',
+    title: 'Sale completed',
+    description: `MVR ${sale.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    entityType: 'Sale',
+    entityId: sale.id,
+  });
 
   revalidatePath('/sell');
   revalidatePath('/products');
