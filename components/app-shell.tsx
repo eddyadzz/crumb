@@ -16,6 +16,7 @@ import {
   Sparkles,
   ClipboardList,
   CalendarDays,
+  CalendarRange,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -33,6 +34,7 @@ const mainNav = [
 ];
 
 const moreNav = [
+  { href: '/forecast', label: 'Forecast', icon: CalendarRange },
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/reports', label: 'Reports', icon: BarChart3 },

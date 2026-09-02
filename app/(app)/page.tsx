@@ -17,8 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { prisma } from '@/lib/prisma';
-import { formatMVR } from '@/lib/costing';
+import { formatMVR, formatBaseQuantity } from '@/lib/costing';
 import { recipeCostPerServing } from '@/lib/queries';
+import { aggregateBatches, forecastRequirements, forecastSummary } from '@/lib/forecast';
 import { getTenantContext } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ export default async function DashboardPage() {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const [sales, products, lowStock, productionOrders, recipes, customerOrders] = await Promise.all([
+  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders] = await Promise.all([
     prisma.sale.findMany({
       where: { tenantId, createdAt: { gte: startOfToday } },
       include: {
@@ -74,6 +75,20 @@ export default async function DashboardPage() {
       include: {
         customer: { select: { name: true } },
         items: { include: { product: { select: { name: true } } } },
+      },
+    }),
+    prisma.customerOrder.findMany({
+      where: {
+        tenantId,
+        status: { in: ['CONFIRMED', 'IN_PRODUCTION', 'READY'] },
+        deliveryDate: { gte: startOfToday, lte: new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000) },
+      },
+      include: {
+        items: {
+          include: {
+            product: { include: { recipe: { select: { id: true, name: true, servingsProduced: true } } } },
+          },
+        },
       },
     }),
   ]);
@@ -148,6 +163,30 @@ export default async function DashboardPage() {
       deliveryTime: o.deliveryTime,
       itemsLabel: o.items.map((i) => `${i.quantity}× ${i.product.name}`).join(', '),
     }));
+
+  const forecastBatches = forecastOrders.flatMap((o) =>
+    aggregateBatches(
+      o.items.map((i) => ({
+        quantity: i.quantity,
+        productType: i.product.type,
+        servingsProduced: i.product.recipe.servingsProduced,
+        recipeId: i.product.recipe.id,
+        recipeName: i.product.recipe.name,
+      }))
+    )
+  );
+  const forecastRows = forecastRequirements(
+    recipes.map((r) => ({
+      id: r.id,
+      ingredients: r.recipeIngredients.map((ri) => ({
+        quantity: ri.quantity,
+        unit: ri.unit,
+        ingredient: ri.ingredient,
+      })),
+    })),
+    forecastBatches
+  );
+  const forecastSummaryData = forecastSummary(forecastRows, forecastOrders.length);
 
   const recipesVM = recipes.map((recipe) => {
     const perServing = recipeCostPerServing(recipe);
@@ -295,6 +334,46 @@ export default async function DashboardPage() {
                 </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {forecastSummaryData.ingredientsShort > 0 && (
+        <Card className="border-warning/30 bg-warning/5">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Forecast Shortages
+              <span className="text-sm font-normal text-warning">· next 7 days</span>
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/forecast">
+                Open Forecast
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {forecastSummaryData.ingredientsShort} ingredient
+              {forecastSummaryData.ingredientsShort > 1 ? 's' : ''} short across{' '}
+              {forecastSummaryData.orderCount} order
+              {forecastSummaryData.orderCount === 1 ? '' : 's'}. Estimated purchase cost:{' '}
+              <span className="font-semibold text-foreground">{formatMVR(forecastSummaryData.estimatedCost)}</span>.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {forecastRows
+                .filter((r) => !r.enough)
+                .slice(0, 6)
+                .map((r) => (
+                  <div key={r.ingredientId} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                    <span className="text-sm font-medium">{r.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      short {formatBaseQuantity(r.shortageBase, r.baseUnit)}
+                    </span>
+                  </div>
+                ))}
+            </div>
           </CardContent>
         </Card>
       )}
