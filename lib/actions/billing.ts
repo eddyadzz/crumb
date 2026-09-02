@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenant, requirePermission } from '@/lib/tenant';
 import { resolvePlanFeatures, type PlanFeatures } from '@/lib/plans';
 import { sendSubscriptionRequestReceivedEmail } from '@/lib/mail';
 import { recordActivity } from '@/lib/activity';
@@ -86,7 +86,7 @@ export type SubmitResult =
 export async function submitSubscriptionRequest(
   input: SubmitSubscriptionRequestInput
 ): Promise<SubmitResult> {
-  const ctx = await requireTenant();
+  const ctx = await requirePermission('billing.manage');
 
   const plan = await prisma.plan.findUnique({ where: { id: input.planId } });
   if (!plan || !plan.active) return { ok: false, error: 'Plan not found' };
@@ -161,7 +161,7 @@ export async function submitSubscriptionRequest(
 }
 
 export async function getMyRequests(): Promise<UpgradeRequestInfo[]> {
-  const ctx = await requireTenant();
+  const ctx = await requirePermission('billing.manage');
   const requests = await prisma.subscriptionRequest.findMany({
     where: { tenantId: ctx.tenantId },
     include: {

@@ -16,9 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { hasPermission } from '@/lib/permissions-core';
+import type { UserRole } from '@prisma/client';
 
 export function TeamCard({ role }: { role: string }) {
-  const canManage = role === 'OWNER' || role === 'MANAGER';
+  const canManage = hasPermission(role as UserRole, 'team.manage');
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,8 +87,8 @@ export function TeamCard({ role }: { role: string }) {
       <CardContent className="space-y-4">
         {!canManage && (
           <p className="text-xs text-muted-foreground">
-            You have read-only access to the team list. Only the owner and managers
-            can invite or remove members.
+            You have read-only access to the team list. Only the owner can invite
+            or remove members.
           </p>
         )}
 

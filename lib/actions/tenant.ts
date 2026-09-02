@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
-import { requireTenant, requireTenantWritable } from '@/lib/tenant';
+import { requireTenant, requirePermission } from '@/lib/tenant';
 import { slugify } from '@/lib/slug';
 import { resolvePlanFeatures, type PlanFeatures } from '@/lib/plans';
 import { sendTrialStartedEmail, sendWelcomeEmail } from '@/lib/mail';
@@ -182,7 +182,7 @@ export async function getStockPolicy(): Promise<StockPolicy> {
 }
 
 export async function setStockPolicy(policy: StockPolicy) {
-  const { tenantId } = await requireTenantWritable();
+  const { tenantId } = await requirePermission('settings.manage');
   await prisma.tenant.update({
     where: { id: tenantId },
     data: { stockPolicy: policy },

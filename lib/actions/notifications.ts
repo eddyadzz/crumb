@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { requireTenant } from '@/lib/tenant';
+import { requireTenant, requirePermission } from '@/lib/tenant';
 import { revalidatePath } from 'next/cache';
 
 export interface NotificationRow {
@@ -99,7 +99,7 @@ export async function getNotificationPrefs(): Promise<NotificationPrefs> {
 }
 
 export async function updateNotificationPrefs(input: NotificationPrefs) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requirePermission('settings.manage');
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {

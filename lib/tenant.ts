@@ -11,6 +11,12 @@ import {
   type FeatureKey,
   type PlanFeatures,
 } from '@/lib/plans';
+import {
+  hasPermission,
+  permissionLabel,
+  type Permission,
+} from '@/lib/permissions-core';
+import type { UserRole } from '@prisma/client';
 
 export type TenantContext = {
   userId: string;
@@ -164,4 +170,31 @@ export async function requireFeature(feature: FeatureKey): Promise<TenantContext
 /** Pattern that scopes every human-owned record lookup to the session tenant. */
 export function tenantWhere(tenantId: string) {
   return { tenantId };
+}
+
+/**
+ * Gate a mutation on an exact role (or higher). Throws when the member's role
+ * is below `required`. Use for coarse gates; prefer requirePermission for the
+ * finer-grained capabilities.
+ */
+export async function requireRole(required: UserRole): Promise<TenantContext> {
+  const ctx = await requireTenant();
+  const rank: Record<UserRole, number> = { OWNER: 3, MANAGER: 2, STAFF: 1 };
+  if (rank[ctx.role as UserRole] < rank[required]) {
+    throw new Error(`Requires at least the ${required} role`);
+  }
+  return ctx;
+}
+
+/**
+ * The single authorization gate for tenant member actions. Resolves the
+ * session's active membership and checks it against the central permission
+ * matrix. Throws when the member lacks `permission`.
+ */
+export async function requirePermission(permission: Permission): Promise<TenantContext> {
+  const ctx = await requireTenant();
+  if (!hasPermission(ctx.role as UserRole, permission)) {
+    throw new Error(`This action requires the ${permissionLabel(permission)} permission, which your role does not have`);
+  }
+  return ctx;
 }

@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { requireTenant, requireTenantWritable, requireFeature } from '@/lib/tenant';
+import { hasPermission } from '@/lib/permissions-core';
 import { recordActivity } from '@/lib/activity';
 import { sendInviteEmail } from '@/lib/mail';
 import {
@@ -71,10 +72,10 @@ export async function teamList() {
   };
 }
 
-/** Only OWNER / MANAGER may manage the team. */
+/** Only members holding `team.manage` (Owner, per the permission matrix) may manage the team. */
 async function requireTeamManager(): Promise<Awaited<ReturnType<typeof requireTenantWritable>>> {
   const ctx = await requireTenantWritable();
-  if (ctx.role !== 'OWNER' && ctx.role !== 'MANAGER') {
+  if (!hasPermission(ctx.role as UserRole, 'team.manage')) {
     throw new Error('You do not have permission to manage the team');
   }
   return ctx;
@@ -82,8 +83,8 @@ async function requireTeamManager(): Promise<Awaited<ReturnType<typeof requireTe
 
 export async function teamInvite(input: { email: string; role: 'MANAGER' | 'STAFF' }) {
   const ctx = await requireFeature('multiUser');
-  if (ctx.role !== 'OWNER' && ctx.role !== 'MANAGER') {
-    return { error: 'Only the owner or a manager can send invitations' };
+  if (!hasPermission(ctx.role as UserRole, 'team.manage')) {
+    return { error: 'You do not have permission to manage the team' };
   }
 
   const email = input.email.trim().toLowerCase();

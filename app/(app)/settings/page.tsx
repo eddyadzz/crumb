@@ -35,6 +35,8 @@ import {
   type UpgradeRequestInfo,
 } from '@/lib/actions/billing';
 import { FEATURE_KEYS, FEATURE_LABELS } from '@/lib/plans';
+import { hasPermission } from '@/lib/permissions-core';
+import type { UserRole } from '@prisma/client';
 import {
   getNotificationPrefs,
   updateNotificationPrefs,
@@ -89,6 +91,10 @@ export default function SettingsPage() {
   const includedFeatures = account
     ? FEATURE_KEYS.filter((f) => account.planFeatures[f] === true)
     : [];
+
+  const role = (account?.role ?? 'STAFF') as UserRole;
+  const canManageBilling = hasPermission(role, 'billing.manage');
+  const canManageSettings = hasPermission(role, 'settings.manage');
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -190,6 +196,7 @@ export default function SettingsPage() {
 
       {account && <TeamCard role={account.role} />}
 
+      {canManageBilling && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -514,7 +521,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
+      {canManageSettings && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -569,6 +578,7 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -582,11 +592,17 @@ export default function SettingsPage() {
             Choose which daily updates you receive as email. In-app
             notifications in the bell always show regardless of these settings.
           </p>
+          {!canManageSettings && (
+            <p className="text-xs text-muted-foreground">
+              Only the owner can change notification preferences.
+            </p>
+          )}
           <NotifToggle
             label="Low Stock Alerts"
             description="Ingredients running below their reorder level"
             checked={notifPrefs?.notifLowStockEmail ?? true}
             onChange={(v) => toggleNotifPref('notifLowStockEmail', v)}
+            disabled={!canManageSettings}
           />
           <Separator />
           <NotifToggle
@@ -594,6 +610,7 @@ export default function SettingsPage() {
             description="Customer orders due today and tomorrow"
             checked={notifPrefs?.notifOrdersEmail ?? true}
             onChange={(v) => toggleNotifPref('notifOrdersEmail', v)}
+            disabled={!canManageSettings}
           />
           <Separator />
           <NotifToggle
@@ -601,6 +618,7 @@ export default function SettingsPage() {
             description="Production batches scheduled for today"
             checked={notifPrefs?.notifProductionEmail ?? true}
             onChange={(v) => toggleNotifPref('notifProductionEmail', v)}
+            disabled={!canManageSettings}
           />
           <Separator />
           <NotifToggle
@@ -608,6 +626,7 @@ export default function SettingsPage() {
             description="Upgrade approvals, rejections and subscription notices"
             checked={notifPrefs?.notifBillingEmail ?? true}
             onChange={(v) => toggleNotifPref('notifBillingEmail', v)}
+            disabled={!canManageSettings}
           />
           <Separator />
           <NotifToggle
@@ -615,6 +634,7 @@ export default function SettingsPage() {
             description="Trial reminders and when your trial ends"
             checked={notifPrefs?.notifTrialEmail ?? true}
             onChange={(v) => toggleNotifPref('notifTrialEmail', v)}
+            disabled={!canManageSettings}
           />
         </CardContent>
       </Card>
@@ -667,11 +687,13 @@ function NotifToggle({
   description,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   description: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -679,7 +701,7 @@ function NotifToggle({
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
   );
 }
