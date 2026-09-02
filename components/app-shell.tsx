@@ -15,6 +15,7 @@ import {
   Wrench,
   Sparkles,
   ClipboardList,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -24,6 +25,7 @@ import { useState } from 'react';
 
 const mainNav = [
   { href: '/', label: 'Home', icon: Home },
+  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/orders', label: 'Orders', icon: ClipboardList },
   { href: '/recipes', label: 'Recipes', icon: ChefHat },
   { href: '/produce', label: 'Produce', icon: Factory },

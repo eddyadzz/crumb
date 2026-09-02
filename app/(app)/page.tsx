@@ -131,6 +131,24 @@ export default async function DashboardPage() {
       itemsLabel: o.items.map((i) => `${i.quantity}× ${i.product.name}`).join(', '),
     }));
 
+  const todaysOrders = customerOrders
+    .filter((o) => {
+      if (!o.deliveryDate) return false;
+      const d = o.deliveryDate;
+      return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+    })
+    .sort((a, b) => {
+      if (a.deliveryTime && b.deliveryTime) return a.deliveryTime.localeCompare(b.deliveryTime);
+      return a.deliveryTime ? -1 : b.deliveryTime ? 1 : 0;
+    })
+    .map((o) => ({
+      id: o.id,
+      status: o.status,
+      customerName: o.customer?.name ?? null,
+      deliveryTime: o.deliveryTime,
+      itemsLabel: o.items.map((i) => `${i.quantity}× ${i.product.name}`).join(', '),
+    }));
+
   const recipesVM = recipes.map((recipe) => {
     const perServing = recipeCostPerServing(recipe);
     const product = recipe.products[0];
@@ -244,6 +262,42 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {todaysOrders.length > 0 && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ClipboardList className="h-5 w-5 text-muted-foreground" />
+              Today&apos;s Work Queue
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/schedule">
+                Open Schedule
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {todaysOrders.map((o) => (
+              <div key={o.id} className="flex items-center justify-between rounded-xl border border-border p-3 transition-colors hover:bg-muted/50">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{o.itemsLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.customerName ?? 'Walk-in'}
+                    {o.deliveryTime ? ` · deliver at ${o.deliveryTime}` : ''}
+                  </p>
+                </div>
+                <Badge
+                  variant={o.status === 'READY' ? 'default' : 'secondary'}
+                  className={o.status === 'READY' ? 'bg-success/10 text-success' : ''}
+                >
+                  {o.status === 'READY' ? 'Ready' : o.status === 'IN_PRODUCTION' ? 'In Production' : 'Confirmed'}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {upcomingOrders.length > 0 && (
         <Card>

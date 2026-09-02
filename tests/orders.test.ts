@@ -3,6 +3,9 @@ import {
   canTransition,
   orderTotal,
   planFromOrderLines,
+  dateKey,
+  groupOrdersByDay,
+  windowDayKeys,
   type OrderLineToPlan,
 } from '@/lib/orders';
 import { shortage, rollupRecipeRequirements, blockForShortage } from '@/lib/stock';
@@ -99,6 +102,41 @@ describe('planFromOrderLines', () => {
   it('ignores non-positive quantities', () => {
     const { recipeItems } = planFromOrderLines([line({ quantity: 0 })]);
     expect(recipeItems).toHaveLength(0);
+  });
+});
+
+describe('schedule grouping', () => {
+  it('formats a local calendar-day key without timezone shift', () => {
+    expect(dateKey(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(dateKey(new Date(2026, 10, 23))).toBe('2026-11-23');
+  });
+
+  it('groups orders by delivery date, ignoring time-of-day', () => {
+    const a = { id: 'a', deliveryDate: new Date(2026, 8, 2, 9, 30) };
+    const b = { id: 'b', deliveryDate: new Date(2026, 8, 2, 16, 0) };
+    const c = { id: 'c', deliveryDate: new Date(2026, 8, 3) };
+    const days = groupOrdersByDay([a, b, c]);
+    expect(days).toHaveLength(2);
+    expect(days[0].key).toBe('2026-09-02');
+    expect(days[0].orders.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(days[1].key).toBe('2026-09-03');
+  });
+
+  it('sorts days ascending and buckets unscheduled orders last', () => {
+    const later = { id: 'later', deliveryDate: new Date(2026, 8, 5) };
+    const earlier = { id: 'earlier', deliveryDate: new Date(2026, 8, 1) };
+    const none = { id: 'none', deliveryDate: null };
+    const days = groupOrdersByDay([later, none, earlier]);
+    expect(days.map((d) => d.key)).toEqual(['2026-09-01', '2026-09-05', null]);
+    expect(days[2].orders.map((o) => o.id)).toEqual(['none']);
+  });
+
+  it('produces ascending day keys for a window', () => {
+    expect(windowDayKeys(new Date(2026, 8, 2), 3)).toEqual([
+      '2026-09-02',
+      '2026-09-03',
+      '2026-09-04',
+    ]);
   });
 });
 
