@@ -19,6 +19,7 @@ import {
   CalendarRange,
   Bell,
   Activity,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -43,6 +44,7 @@ const moreNav = [
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/pricing', label: 'Pricing', icon: Tag },
   { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

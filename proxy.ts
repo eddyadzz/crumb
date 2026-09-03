@@ -24,6 +24,7 @@ const RESERVED = new Set([
   'api',
   '_next',
   'floor',
+  'pricing',
 ]);
 
 export async function proxy(request: NextRequest) {

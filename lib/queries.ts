@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { convertToBase, costPerBaseUnit } from '@/lib/costing';
+import { pricingSummary, type PricingSummary } from '@/lib/pricing';
 import {
   computeCostedVariance,
   batchCostSummary,
@@ -644,4 +645,57 @@ export async function getEfficiencyMetrics(tenantId: string, days = 30): Promise
         : null,
     recipes,
   };
+}
+/* ================= PRICING ASSISTANT (Phase I-E) ================= */
+
+export interface RecipePricingVM extends PricingSummary {
+  recipeId: string;
+  recipeName: string;
+  /** MVR of profit lost per unit vs the 30%-margin shelf price. */
+  shortfallPerUnit: number | null;
+}
+
+/**
+ * Per-recipe pricing guidance: planned cost scaled to actual usage cost
+ * (from recorded batch variance), current selling price, and the suggested
+ * margin ladder. Read-only — never mutates prices.
+ */
+export async function getPricingAssistant(tenantId: string): Promise<RecipePricingVM[]> {
+  const [recipes, recipeVariance] = await Promise.all([
+    prisma.recipe.findMany({
+      where: { tenantId },
+      include: {
+        recipeIngredients: { include: { ingredient: true } },
+        products: true,
+      },
+      orderBy: { name: 'asc' },
+    }),
+    getRecipeVariance(tenantId),
+  ]);
+
+  const varianceByRecipe = new Map(recipeVariance.map((r) => [r.recipeId, r.varianceCostPct]));
+
+  const rows: RecipePricingVM[] = recipes.map((recipe) => {
+    const plannedCost = recipeCostPerServing(recipe);
+    const varianceCostPct = varianceByRecipe.get(recipe.id) ?? null;
+    const currentPrice = recipe.products[0]?.sellingPrice ?? null;
+    const summary = pricingSummary({ plannedCost, varianceCostPct, currentPrice });
+    const firstRung = summary.ladder[0];
+    const shortfallPerUnit =
+      currentPrice !== null && firstRung && currentPrice < firstRung.shelf
+        ? firstRung.shelf - currentPrice
+        : null;
+    return {
+      recipeId: recipe.id,
+      recipeName: recipe.name,
+      ...summary,
+      shortfallPerUnit,
+    };
+  });
+
+  // Underpriced recipes first, then unpriced, then healthy ones.
+  const rank: Record<string, number> = { 'below-target': 0, unpriced: 1, 'no-cost': 2, 'on-target': 3 };
+  return rows.sort(
+    (a, b) => rank[a.verdict] - rank[b.verdict] || (a.marginAtCurrent ?? 0) - (b.marginAtCurrent ?? 0)
+  );
 }
