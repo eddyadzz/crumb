@@ -3,6 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { convertToBase, costPerBaseUnit } from '@/lib/costing';
 import { pricingSummary, type PricingSummary } from '@/lib/pricing';
 import {
+  aggregateBatches,
+  forecastRequirements,
+} from '@/lib/forecast';
+import {
+  buildShoppingList,
+  shoppingListKey,
+  shoppingListTotal,
+  type ShoppingListItem,
+  type ShoppingListTotal,
+  type PurchasePack,
+} from '@/lib/shopping-list';
+import {
   computeCostedVariance,
   batchCostSummary,
   computeMarginImpact,
@@ -698,4 +710,102 @@ export async function getPricingAssistant(tenantId: string): Promise<RecipePrici
   return rows.sort(
     (a, b) => rank[a.verdict] - rank[b.verdict] || (a.marginAtCurrent ?? 0) - (b.marginAtCurrent ?? 0)
   );
+}
+
+/* ================= SHOPPING LIST (Phase I-F) ================= */
+
+export interface ShoppingListVM {
+  listKey: string;
+  items: ShoppingListItem[];
+  /** Ingredients already covered by stock — shown as context, not chores. */
+  inStock: { name: string; requiredBase: number; baseUnit: string }[];
+  total: ShoppingListTotal;
+  orderCount: number;
+  nextDelivery: string | null;
+}
+
+/**
+ * The actionable shopping list for upcoming customer orders: forecast
+ * requirements minus stock, with pack suggestions and estimated costs.
+ */
+export async function getShoppingList(tenantId: string): Promise<ShoppingListVM> {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const [orders, recipes] = await Promise.all([
+    prisma.customerOrder.findMany({
+      where: {
+        tenantId,
+        status: { in: ['CONFIRMED', 'IN_PRODUCTION', 'READY'] },
+        deliveryDate: { gte: startOfToday },
+      },
+      orderBy: { deliveryDate: 'asc' },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: { recipe: { select: { id: true, name: true, servingsProduced: true } } },
+            },
+          },
+        },
+      },
+    }),
+    prisma.recipe.findMany({
+      where: { tenantId },
+      orderBy: { name: 'asc' },
+      include: { recipeIngredients: { include: { ingredient: true } } },
+    }),
+  ]);
+
+  const batches = aggregateBatches(
+    orders.flatMap((o) =>
+      o.items.map((i) => ({
+        quantity: i.quantity,
+        productType: i.product.type,
+        servingsProduced: i.product.recipe.servingsProduced,
+        recipeId: i.product.recipe.id,
+        recipeName: i.product.recipe.name,
+      }))
+    )
+  );
+
+  const forecastRecipes = recipes.map((r) => ({
+    id: r.id,
+    ingredients: r.recipeIngredients.map((ri) => ({
+      quantity: ri.quantity,
+      unit: ri.unit,
+      ingredient: {
+        id: ri.ingredient.id,
+        name: ri.ingredient.name,
+        availableQuantity: ri.ingredient.availableQuantity,
+        baseUnit: ri.ingredient.baseUnit,
+        purchaseQuantity: ri.ingredient.purchaseQuantity,
+        purchaseUnit: ri.ingredient.purchaseUnit,
+        purchaseCost: ri.ingredient.purchaseCost,
+      },
+    })),
+  }));
+
+  const rows = forecastRequirements(forecastRecipes, batches);
+  const packs: Record<string, PurchasePack> = {};
+  for (const r of forecastRecipes) {
+    for (const ri of r.ingredients) {
+      packs[ri.ingredient.id] = {
+        purchaseQuantity: ri.ingredient.purchaseQuantity,
+        purchaseUnit: ri.ingredient.purchaseUnit,
+      };
+    }
+  }
+
+  const items = buildShoppingList(rows, packs);
+  return {
+    listKey: shoppingListKey(items),
+    items,
+    inStock: rows
+      .filter((r) => r.enough)
+      .map((r) => ({ name: r.name, requiredBase: r.requiredBase, baseUnit: r.baseUnit })),
+    total: shoppingListTotal(rows),
+    orderCount: orders.length,
+    nextDelivery: orders[0]?.deliveryDate?.toISOString() ?? null,
+  };
 }

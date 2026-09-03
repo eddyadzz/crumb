@@ -25,6 +25,7 @@ const RESERVED = new Set([
   '_next',
   'floor',
   'pricing',
+  'shopping-list',
 ]);
 
 export async function proxy(request: NextRequest) {
