@@ -10,9 +10,11 @@ import {
   subscriptionApprovedEmailContent,
   subscriptionRejectedEmailContent,
   notificationDigestEmailContent,
+  briefingEmailContent,
   inviteEmailContent,
   type EmailContent,
 } from './templates';
+import type { Briefing } from '@/lib/briefing';
 
 const MAILGUN_BASE = 'https://api.mailgun.net/v3';
 const MAILGUN_BASE_EU = 'https://api.eu.mailgun.net/v3';
@@ -236,5 +238,20 @@ export async function sendInviteEmail({
   await sendMail({
     to,
     content: inviteEmailContent({ tenantName, role, inviteUrl }),
+  });
+}
+
+export async function sendOrderReminderEmail({
+  to,
+  tenantName,
+  briefing,
+}: {
+  to: string;
+  tenantName: string;
+  briefing: Briefing;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: briefingEmailContent({ tenantName, ...briefing }),
   });
 }

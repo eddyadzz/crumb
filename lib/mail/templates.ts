@@ -274,3 +274,75 @@ export function notificationDigestEmailContent({
     [`Crumb update for ${tenantName}:`].concat(lines.map((l) => `- ${l.text}`))
   );
 }
+export function briefingEmailContent({
+  tenantName,
+  dateLabel,
+  orderLines,
+  batchesNeeded,
+  batchLines,
+  shortages,
+  expectedRevenue,
+  hasContent,
+}: {
+  tenantName: string;
+  dateLabel: string;
+  orderLines: Array<{ label: string }>;
+  batchesNeeded: number;
+  batchLines: Array<{ label: string }>;
+  shortages: Array<{ label: string }>;
+  expectedRevenue: number;
+  hasContent: boolean;
+}): EmailContent {
+  if (!hasContent) {
+    // Callers skip empty briefings; this is a defensive fallback.
+    return shell(
+      `Morning briefing — ${tenantName}`,
+      `Nothing is due ${dateLabel}.`,
+      '<p style="font-size:15px;color:#57534e;">Enjoy the quiet morning!</p>',
+      [`Nothing is due ${dateLabel}.`]
+    );
+  }
+
+  const rowsHtml = orderLines
+    .map((l) => `<tr><td style="padding:10px 12px;border-top:1px solid #e7e5e4;font-size:15px;color:#1c1917;">🎂&nbsp; ${l.label}</td></tr>`)
+    .join('');
+  const orderTable = `<table style="width:100%;border-collapse:collapse;margin:16px 0;"><tbody>${rowsHtml}</tbody></table>`;
+
+  const shortageHtml = shortages.length
+    ? `<p style="font-size:15px;color:#b45309;margin:16px 0 8px;"><strong>Ingredient shortages</strong></p><ul style="font-size:15px;color:#1c1917;padding-left:20px;margin:0;">${shortages
+        .map((s) => `<li>${s.label}</li>`)
+        .join('')}</ul>`
+    : '';
+
+  const bodyHtml =
+    orderTable +
+    `<p style="font-size:15px;color:#1c1917;margin:16px 0 8px;"><strong>Need production: ${batchesNeeded} batch${batchesNeeded === 1 ? '' : 'es'}</strong></p>` +
+    `<ul style="font-size:15px;color:#57534e;padding-left:20px;margin:0;">${batchLines
+      .map((b) => `<li>${b.label}</li>`)
+      .join('')}</ul>` +
+    shortageHtml +
+    `<p style="font-size:16px;color:#1c1917;margin:20px 0 0;"><strong>Expected revenue: ${Math.round(expectedRevenue)} MVR</strong></p>`;
+
+  const subject = `Morning briefing — ${orderLines.length} item${orderLines.length === 1 ? '' : 's'} due ${dateLabel}`;
+
+  const textLines = [
+    `Morning briefing for ${tenantName} — due ${dateLabel}:`,
+    '',
+    ...orderLines.map((l) => `• ${l.label}`),
+    '',
+    `Need production: ${batchesNeeded} batch${batchesNeeded === 1 ? '' : 'es'}`,
+    ...batchLines.map((b) => `  - ${b.label}`),
+    ...(shortages.length
+      ? ['', 'Ingredient shortages:', ...shortages.map((s) => `  - ${s.label}`)]
+      : []),
+    '',
+    `Expected revenue: ${Math.round(expectedRevenue)} MVR`,
+  ];
+
+  return shell(
+    subject,
+    `Here's what's due for ${tenantName}.`,
+    bodyHtml,
+    textLines
+  );
+}
