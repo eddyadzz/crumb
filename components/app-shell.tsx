@@ -22,12 +22,14 @@ import {
   Tag,
   ListChecks,
   Users,
+  RefreshCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { NotificationsBell } from '@/components/notifications-bell';
+import { SyncStatusPill } from '@/components/sync-status-pill';
 import { ModeToggle, useUiMode } from '@/components/mode-toggle';
 import { useState } from 'react';
 
@@ -51,6 +53,7 @@ const moreNav = [
   { href: '/pricing', label: 'Pricing', icon: Tag },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
+  { href: '/sync', label: 'Sync Center', icon: RefreshCcw },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -78,6 +81,7 @@ const simpleMore = [
   byHref('/pricing'),
   byHref('/reports'),
   byHref('/tools'),
+  byHref('/sync'),
   byHref('/settings'),
 ];
 
@@ -151,7 +155,7 @@ export function AppShell({
           })}
         </nav>
         <div className="border-t border-border p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="rounded-xl bg-accent/50 p-3">
               <p className="text-xs font-semibold text-accent-foreground">
                 {planLine}
@@ -160,7 +164,10 @@ export function AppShell({
                 {account.tenantName}
               </p>
             </div>
-            <NotificationsBell />
+            <div className="flex shrink-0 flex-col items-center gap-1.5">
+              <SyncStatusPill />
+              <NotificationsBell />
+            </div>
           </div>
         </div>
       </aside>
@@ -178,6 +185,7 @@ export function AppShell({
             </span>
           </Link>
           <div className="flex items-center gap-1">
+            <SyncStatusPill />
             <NotificationsBell />
             <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger asChild>

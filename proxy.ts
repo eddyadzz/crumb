@@ -29,6 +29,7 @@ const RESERVED = new Set([
   'customers',
   'order',
   'status',
+  'sync',
 ]);
 
 export async function proxy(request: NextRequest) {

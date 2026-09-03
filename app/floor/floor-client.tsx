@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,6 +26,16 @@ import {
   completeProductionOrder,
   type ProductionActualInput,
 } from '@/lib/actions/production';
+import {
+  getOutboxSnapshot,
+  writeOutbox,
+  newOpId,
+  markSynced,
+  lastSyncedAt,
+  relativeSyncLabel,
+  type OutboxOp,
+} from '@/lib/sync-outbox';
+import { useOutboxSync } from '@/components/use-outbox-sync';
 
 export interface FloorIngredientVM {
   ingredientId: string;
@@ -52,101 +62,6 @@ function stepFor(unit: string): number {
   return unit === 'pcs' ? 1 : 5;
 }
 
-/* ================= OFFLINE OUTBOX =================
- * Queued production ops made while offline, persisted to localStorage and
- * replayed through the real server actions once connectivity returns. */
-
-type OutboxOp = {
-  id: string;
-  type: 'start' | 'complete';
-  orderId: string;
-  label: string;
-  /** Only for complete ops. */
-  actuals?: ProductionActualInput[];
-  variance?: number;
-  createdAt: string;
-};
-
-const OUTBOX_KEY = 'crumb-floor-outbox';
-const OUTBOX_EVENT = 'crumb-outbox';
-const EMPTY_OPS: OutboxOp[] = [];
-
-let snapshotRaw: string | null = null;
-let snapshotOps: OutboxOp[] = EMPTY_OPS;
-
-/** useSyncExternalStore snapshot: stable reference per stored value. */
-function getOutboxSnapshot(): OutboxOp[] {
-  try {
-    const raw = localStorage.getItem(OUTBOX_KEY) ?? '';
-    if (raw !== snapshotRaw) {
-      snapshotRaw = raw;
-      const parsed = raw ? (JSON.parse(raw) as OutboxOp[]) : [];
-      snapshotOps = Array.isArray(parsed) && parsed.length > 0 ? parsed : EMPTY_OPS;
-    }
-    return snapshotOps;
-  } catch {
-    return EMPTY_OPS;
-  }
-}
-
-function subscribeOutbox(notify: () => void) {
-  const handler = () => notify();
-  window.addEventListener('online', handler);
-  window.addEventListener('storage', handler);
-  window.addEventListener(OUTBOX_EVENT, handler);
-  return () => {
-    window.removeEventListener('online', handler);
-    window.removeEventListener('storage', handler);
-    window.removeEventListener(OUTBOX_EVENT, handler);
-  };
-}
-
-function writeOutbox(ops: OutboxOp[]) {
-  try {
-    localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops));
-  } catch {
-    // Private mode / storage full: the in-memory copy still drives this visit.
-  }
-  window.dispatchEvent(new Event(OUTBOX_EVENT));
-}
-
-function makeOpId(): string {
-  return `op-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/* ================= LAST SYNCED ================= */
-
-const LAST_SYNC_KEY = 'crumb-floor-last-sync';
-
-function markSynced() {
-  try {
-    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-  } catch {
-    // ignore
-  }
-}
-
-function lastSyncedAt(): number | null {
-  try {
-    const raw = localStorage.getItem(LAST_SYNC_KEY);
-    const t = raw ? Number(raw) : NaN;
-    return Number.isFinite(t) ? t : null;
-  } catch {
-    return null;
-  }
-}
-
-function relativeSyncLabel(ms: number): string {
-  const mins = Math.floor((Date.now() - ms) / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins === 1) return '1 min ago';
-  if (mins < 60) return `${mins} mins ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours === 1) return '1 hr ago';
-  if (hours < 24) return `${hours} hrs ago`;
-  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 export function FloorClient({
   tenantName,
   orders,
@@ -159,10 +74,13 @@ export function FloorClient({
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState<FloorOrderVM | null>(null);
   const [justCompleted, setJustCompleted] = useState<{ label: string; variance: number; queued?: boolean } | null>(null);
-  const outbox = useSyncExternalStore(subscribeOutbox, getOutboxSnapshot, () => EMPTY_OPS);
-  const flushingRef = useRef(false);
   const [clock, setClock] = useState<string | null>(null);
   const [syncLabel, setSyncLabel] = useState<string | null>(null);
+
+  const { outbox, pending: syncing } = useOutboxSync({
+    onUploaded: (op) => setJustCompleted({ label: op.label, variance: op.variance ?? 0 }),
+  });
+  const busy = pending || syncing;
 
   useEffect(() => {
     const tick = () => {
@@ -175,51 +93,8 @@ export function FloorClient({
     return () => clearInterval(t);
   }, []);
 
-  /** Replay queued ops oldest-first through the real server actions. Network
-   * failures pause the flush; business-rule failures (stale op) drop the op. */
-  const flushOutbox = useCallback(() => {
-    if (flushingRef.current) return;
-    const ops = getOutboxSnapshot();
-    if (ops.length === 0 || !navigator.onLine) return;
-    flushingRef.current = true;
-    startTransition(async () => {
-      const remaining = [...ops];
-      let mutated = false;
-      while (remaining.length > 0) {
-        const op = remaining[0];
-        try {
-          if (op.type === 'start') {
-            await startProductionOrder(op.orderId);
-          } else {
-            await completeProductionOrder(op.orderId, op.actuals);
-          }
-          remaining.shift();
-          mutated = true;
-          setJustCompleted({ label: op.label, variance: op.variance ?? 0 });
-        } catch (e) {
-          if (e instanceof TypeError) break; // network dropped mid-sync — retry later
-          remaining.shift(); // stale/invalid op (e.g. already completed elsewhere) — drop
-          mutated = true;
-        }
-      }
-      writeOutbox(remaining);
-      flushingRef.current = false;
-      if (mutated) {
-        markSynced();
-        router.refresh();
-      }
-    });
-  }, [router]);
-
-  useEffect(() => {
-    flushOutbox();
-    const onOnline = () => flushOutbox();
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [flushOutbox]);
-
   const enqueue = (op: Omit<OutboxOp, 'id' | 'createdAt'>) => {
-    writeOutbox([...getOutboxSnapshot(), { ...op, id: makeOpId(), createdAt: new Date().toISOString() }]);
+    writeOutbox([...getOutboxSnapshot(), { ...op, id: newOpId(), createdAt: new Date().toISOString() }]);
   };
 
   const inProgress = orders.filter((o) => o.status === 'IN_PROGRESS');
@@ -393,7 +268,7 @@ export function FloorClient({
               <Button
                 size="lg"
                 className="h-16 w-full text-lg font-bold"
-                disabled={pending || queuedOrderIds.has(order.id)}
+                disabled={busy || queuedOrderIds.has(order.id)}
                 onClick={() => setCompleting(order)}
               >
                 <CheckCircle2 className="h-6 w-6" />
@@ -418,7 +293,7 @@ export function FloorClient({
                 size="lg"
                 variant="secondary"
                 className="h-16 w-full text-lg font-bold"
-                disabled={pending || queuedOrderIds.has(order.id)}
+                disabled={busy || queuedOrderIds.has(order.id)}
                 onClick={() => start(order)}
               >
                 <Play className="h-6 w-6" />
