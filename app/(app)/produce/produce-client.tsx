@@ -20,7 +20,9 @@ import {
   Scale,
   Check,
   ListChecks,
+  Smartphone,
 } from 'lucide-react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -238,11 +240,19 @@ export function ProduceClient({
         title="Production Floor"
         description="Touch-first queue for daily kitchen runs"
         action={
-          <Button className="gap-2" onClick={() => setPlanOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New Production Plan</span>
-            <span className="sm:hidden">Plan</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link href="/floor">
+                <Smartphone className="h-4 w-4" />
+                <span className="hidden sm:inline">Floor Mode</span>
+              </Link>
+            </Button>
+            <Button className="gap-2" onClick={() => setPlanOpen(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Production Plan</span>
+              <span className="sm:hidden">Plan</span>
+            </Button>
+          </div>
         }
       />
 

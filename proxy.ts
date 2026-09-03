@@ -23,6 +23,7 @@ const RESERVED = new Set([
   'admin',
   'api',
   '_next',
+  'floor',
 ]);
 
 export async function proxy(request: NextRequest) {
