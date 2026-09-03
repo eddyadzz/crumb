@@ -14,7 +14,9 @@ import {
   UploadCloud,
   ArrowUpRight,
   ShieldCheck,
+  LayoutGrid,
 } from 'lucide-react';
+import { ModeToggle } from '@/components/mode-toggle';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -118,6 +120,22 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 lg:p-8">
       <PageHeader title="Settings" description="Manage your preferences" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutGrid className="h-5 w-5 text-muted-foreground" />
+            Interface
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ModeToggle />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Simple keeps the daily baking loop (recipes, produce, orders, sell) up
+            front. Advanced shows every tool, including activity and integrations.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -20,10 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { prisma } from '@/lib/prisma';
 import { formatMVR, formatBaseQuantity } from '@/lib/costing';
-import { recipeCostPerServing, getEfficiencyMetrics } from '@/lib/queries';
+import { recipeCostPerServing, getEfficiencyMetrics, getSetupProgress } from '@/lib/queries';
 import { aggregateBatches, forecastRequirements, forecastSummary } from '@/lib/forecast';
 import { listRecentActivity } from '@/lib/actions/activity';
 import { getTenantContext } from '@/lib/tenant';
+import { SetupChecklist } from '@/components/setup-checklist';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function DashboardPage() {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders, recentActivity, efficiency] = await Promise.all([
+  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders, recentActivity, efficiency, setupProgress] = await Promise.all([
     prisma.sale.findMany({
       where: { tenantId, createdAt: { gte: startOfToday } },
       include: {
@@ -96,6 +97,7 @@ export default async function DashboardPage() {
     }),
     listRecentActivity(5),
     getEfficiencyMetrics(tenantId),
+    getSetupProgress(tenantId),
   ]);
 
   // Sales with cost
@@ -224,6 +226,8 @@ export default async function DashboardPage() {
           </Button>
         }
       />
+
+      <SetupChecklist progress={setupProgress} />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <StatCard label="Today's Revenue" value={formatMVR(todaysRevenue)} icon={<TrendingUp className="h-5 w-5" />} variant="primary" />

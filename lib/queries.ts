@@ -883,3 +883,38 @@ export async function getCustomerInsights(tenantId: string): Promise<{
     }),
   };
 }
+
+/* ================= SETUP PROGRESS (Phase J) ================= */
+
+export interface SetupProgressVM {
+  ingredients: number;
+  recipes: number;
+  pricedProducts: number;
+  customerOrders: number;
+  completedBatches: number;
+  sales: number;
+  /** Only offer sample data on a completely fresh account. */
+  fresh: boolean;
+}
+
+/** Day-1 adoption checklist: what exists vs what the owner still needs to do. */
+export async function getSetupProgress(tenantId: string): Promise<SetupProgressVM> {
+  const [ingredients, recipes, pricedProducts, customerOrders, completedBatches, sales] =
+    await Promise.all([
+      prisma.ingredient.count({ where: { tenantId } }),
+      prisma.recipe.count({ where: { tenantId } }),
+      prisma.product.count({ where: { tenantId, sellingPrice: { gt: 0 } } }),
+      prisma.customerOrder.count({ where: { tenantId, status: { not: 'CANCELLED' } } }),
+      prisma.productionOrder.count({ where: { tenantId, status: 'COMPLETED' } }),
+      prisma.sale.count({ where: { tenantId } }),
+    ]);
+  return {
+    ingredients,
+    recipes,
+    pricedProducts,
+    customerOrders,
+    completedBatches,
+    sales,
+    fresh: ingredients === 0 && recipes === 0,
+  };
+}

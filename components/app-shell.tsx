@@ -28,6 +28,7 @@ import { trialDaysLeft } from '@/lib/trial';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { NotificationsBell } from '@/components/notifications-bell';
+import { ModeToggle, useUiMode } from '@/components/mode-toggle';
 import { useState } from 'react';
 
 const mainNav = [
@@ -47,13 +48,38 @@ const moreNav = [
   { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/products', label: 'Products', icon: Package },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/pricing', label: 'Pricing', icon: Tag },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const allNav = [...mainNav, ...moreNav];
+
+const byHref = (href: string) => allNav.find((i) => i.href === href)!;
+
+/** Simple mode keeps the daily baking loop front and centre and hides the
+ * power-tool surfaces (Activity, SaaS extras). */
+const simpleMain = [
+  byHref('/'),
+  byHref('/recipes'),
+  byHref('/orders'),
+  byHref('/produce'),
+  byHref('/sell'),
+];
+const simpleMore = [
+  byHref('/notifications'),
+  byHref('/schedule'),
+  byHref('/customers'),
+  byHref('/forecast'),
+  byHref('/shopping-list'),
+  byHref('/ingredients'),
+  byHref('/products'),
+  byHref('/pricing'),
+  byHref('/reports'),
+  byHref('/tools'),
+  byHref('/settings'),
+];
 
 export type AccountSummary = {
   tenantName: string;
@@ -71,6 +97,10 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const uiMode = useUiMode();
+  const mainItems = uiMode === 'simple' ? simpleMain : mainNav;
+  const moreItems = uiMode === 'simple' ? simpleMore : moreNav;
+  const sidebarItems = [...mainItems, ...moreItems];
 
   const onTrial = account.subscriptionStatus === 'TRIAL';
   const daysLeft = onTrial ? trialDaysLeft(account.trialEndsAt) : null;
@@ -100,7 +130,7 @@ export function AppShell({
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-4">
-          {allNav.map((item) => {
+          {sidebarItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
@@ -155,7 +185,7 @@ export function AppShell({
                 <MoreHorizontal className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72 p-0">
+            <SheetContent side="right" className="flex w-72 flex-col p-0">
               <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                   <Carrot className="h-5 w-5" />
@@ -170,7 +200,7 @@ export function AppShell({
                 </div>
               </div>
               <nav className="flex flex-col gap-1 p-4">
-                {allNav.map((item) => {
+                {moreItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   return (
@@ -191,6 +221,13 @@ export function AppShell({
                   );
                 })}
               </nav>
+              <div className="mt-auto border-t border-border p-4">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Interface mode</p>
+                <ModeToggle />
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Simple keeps the daily baking loop up front. Advanced shows everything.
+                </p>
+              </div>
             </SheetContent>
           </Sheet>
           </div>
@@ -216,7 +253,7 @@ export function AppShell({
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch border-t border-border bg-card/95 backdrop-blur-lg lg:hidden">
-          {mainNav.map((item) => {
+          {mainItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
