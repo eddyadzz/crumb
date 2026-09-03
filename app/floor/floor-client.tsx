@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,9 +13,12 @@ import {
   ArrowLeft,
   ChefHat,
   LogOut,
+  CloudUpload,
+  WifiOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { InstallButton } from '@/components/install-button';
 import { cn } from '@/lib/utils';
 import { computeVariance, totalVariance } from '@/lib/production-variance';
 import {
@@ -49,6 +52,68 @@ function stepFor(unit: string): number {
   return unit === 'pcs' ? 1 : 5;
 }
 
+/* ================= OFFLINE OUTBOX =================
+ * Queued production ops made while offline, persisted to localStorage and
+ * replayed through the real server actions once connectivity returns. */
+
+type OutboxOp = {
+  id: string;
+  type: 'start' | 'complete';
+  orderId: string;
+  label: string;
+  /** Only for complete ops. */
+  actuals?: ProductionActualInput[];
+  variance?: number;
+  createdAt: string;
+};
+
+const OUTBOX_KEY = 'crumb-floor-outbox';
+const OUTBOX_EVENT = 'crumb-outbox';
+const EMPTY_OPS: OutboxOp[] = [];
+
+let snapshotRaw: string | null = null;
+let snapshotOps: OutboxOp[] = EMPTY_OPS;
+
+/** useSyncExternalStore snapshot: stable reference per stored value. */
+function getOutboxSnapshot(): OutboxOp[] {
+  try {
+    const raw = localStorage.getItem(OUTBOX_KEY) ?? '';
+    if (raw !== snapshotRaw) {
+      snapshotRaw = raw;
+      const parsed = raw ? (JSON.parse(raw) as OutboxOp[]) : [];
+      snapshotOps = Array.isArray(parsed) && parsed.length > 0 ? parsed : EMPTY_OPS;
+    }
+    return snapshotOps;
+  } catch {
+    return EMPTY_OPS;
+  }
+}
+
+function subscribeOutbox(notify: () => void) {
+  const handler = () => notify();
+  window.addEventListener('online', handler);
+  window.addEventListener('storage', handler);
+  window.addEventListener(OUTBOX_EVENT, handler);
+  return () => {
+    window.removeEventListener('online', handler);
+    window.removeEventListener('storage', handler);
+    window.removeEventListener(OUTBOX_EVENT, handler);
+  };
+}
+
+function writeOutbox(ops: OutboxOp[]) {
+  try {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops));
+  } catch {
+    // Private mode / storage full: the in-memory copy still drives this visit.
+  }
+  window.dispatchEvent(new Event(OUTBOX_EVENT));
+}
+
+function makeOpId(): string {
+  return `op-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function FloorClient({
   tenantName,
   orders,
@@ -60,7 +125,9 @@ export function FloorClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState<FloorOrderVM | null>(null);
-  const [justCompleted, setJustCompleted] = useState<{ label: string; variance: number } | null>(null);
+  const [justCompleted, setJustCompleted] = useState<{ label: string; variance: number; queued?: boolean } | null>(null);
+  const outbox = useSyncExternalStore(subscribeOutbox, getOutboxSnapshot, () => EMPTY_OPS);
+  const flushingRef = useRef(false);
   const [clock, setClock] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,23 +137,87 @@ export function FloorClient({
     return () => clearInterval(t);
   }, []);
 
+  /** Replay queued ops oldest-first through the real server actions. Network
+   * failures pause the flush; business-rule failures (stale op) drop the op. */
+  const flushOutbox = useCallback(() => {
+    if (flushingRef.current) return;
+    const ops = getOutboxSnapshot();
+    if (ops.length === 0 || !navigator.onLine) return;
+    flushingRef.current = true;
+    startTransition(async () => {
+      const remaining = [...ops];
+      let mutated = false;
+      while (remaining.length > 0) {
+        const op = remaining[0];
+        try {
+          if (op.type === 'start') {
+            await startProductionOrder(op.orderId);
+          } else {
+            await completeProductionOrder(op.orderId, op.actuals);
+          }
+          remaining.shift();
+          mutated = true;
+          setJustCompleted({ label: op.label, variance: op.variance ?? 0 });
+        } catch (e) {
+          if (e instanceof TypeError) break; // network dropped mid-sync — retry later
+          remaining.shift(); // stale/invalid op (e.g. already completed elsewhere) — drop
+          mutated = true;
+        }
+      }
+      writeOutbox(remaining);
+      flushingRef.current = false;
+      if (mutated) router.refresh();
+    });
+  }, [router]);
+
+  useEffect(() => {
+    flushOutbox();
+    const onOnline = () => flushOutbox();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [flushOutbox]);
+
+  const enqueue = (op: Omit<OutboxOp, 'id' | 'createdAt'>) => {
+    writeOutbox([...getOutboxSnapshot(), { ...op, id: makeOpId(), createdAt: new Date().toISOString() }]);
+  };
+
   const inProgress = orders.filter((o) => o.status === 'IN_PROGRESS');
   const queue = orders.filter((o) => o.status === 'PLANNED');
+  const queuedOrderIds = new Set(outbox.map((op) => op.orderId));
 
   const start = (order: FloorOrderVM) => {
     setError(null);
+    if (!navigator.onLine) {
+      enqueue({ type: 'start', orderId: order.id, label: orderLabel(order) });
+      setJustCompleted({ label: orderLabel(order), variance: 0, queued: true });
+      return;
+    }
     startTransition(async () => {
       try {
         await startProductionOrder(order.id);
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not start the batch');
+        if (!navigator.onLine || e instanceof TypeError) {
+          enqueue({ type: 'start', orderId: order.id, label: orderLabel(order) });
+          setJustCompleted({ label: orderLabel(order), variance: 0, queued: true });
+        } else {
+          setError(e instanceof Error ? e.message : 'Could not start the batch');
+        }
       }
     });
   };
 
   const finishComplete = (order: FloorOrderVM, actuals: ProductionActualInput[], variance: number) => {
     setError(null);
+    const queueIt = () => {
+      enqueue({ type: 'complete', orderId: order.id, label: orderLabel(order), actuals, variance });
+      setJustCompleted({ label: orderLabel(order), variance, queued: true });
+      setCompleting(null);
+    };
+    if (!navigator.onLine) {
+      queueIt();
+      return;
+    }
     startTransition(async () => {
       try {
         await completeProductionOrder(order.id, actuals);
@@ -94,7 +225,11 @@ export function FloorClient({
         setJustCompleted({ label: orderLabel(order), variance });
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not complete the batch');
+        if (!navigator.onLine || e instanceof TypeError) {
+          queueIt();
+        } else {
+          setError(e instanceof Error ? e.message : 'Could not complete the batch');
+        }
       }
     });
   };
@@ -121,12 +256,15 @@ export function FloorClient({
               <p className="text-xs text-muted-foreground">{clock ?? '\u00a0'}</p>
             </div>
           </div>
-          <Button asChild variant="ghost" size="sm" className="shrink-0 gap-1.5">
-            <Link href="/produce">
-              <LogOut className="h-4 w-4" />
-              Exit
-            </Link>
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <InstallButton variant="outline" />
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+              <Link href="/produce">
+                <LogOut className="h-4 w-4" />
+                Exit
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -141,19 +279,52 @@ export function FloorClient({
           </div>
         )}
 
+        {outbox.length > 0 && (
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-warning">
+              <CloudUpload className="h-5 w-5 shrink-0" />
+              {outbox.length} queued change{outbox.length > 1 ? 's' : ''} — syncing when online
+            </div>
+            <ul className="mt-2 space-y-1">
+              {outbox.map((op) => (
+                <li key={op.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">
+                    {op.type === 'start' ? 'Start' : 'Complete'} · {op.label}
+                  </span>
+                  <span className="shrink-0">
+                    {new Date(op.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {justCompleted && (
           <button
             type="button"
             onClick={() => setJustCompleted(null)}
-            className="w-full rounded-2xl border border-success/40 bg-success/10 p-5 text-left"
+            className={cn(
+              'w-full rounded-2xl border p-5 text-left',
+              justCompleted.queued
+                ? 'border-warning/40 bg-warning/10'
+                : 'border-success/40 bg-success/10'
+            )}
           >
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-success" />
+              {justCompleted.queued ? (
+                <WifiOff className="h-8 w-8 text-warning" />
+              ) : (
+                <CheckCircle2 className="h-8 w-8 text-success" />
+              )}
               <div>
-                <p className="text-base font-bold text-success">Batch completed</p>
+                <p className={cn('text-base font-bold', justCompleted.queued ? 'text-warning' : 'text-success')}>
+                  {justCompleted.queued ? 'Queued — you are offline' : 'Batch completed'}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   {justCompleted.label}
-                  {justCompleted.variance !== 0 &&
+                  {!justCompleted.queued &&
+                    justCompleted.variance !== 0 &&
                     ` · ${justCompleted.variance > 0 ? '+' : ''}${justCompleted.variance.toFixed(1)} vs plan`}
                 </p>
               </div>
@@ -172,15 +343,15 @@ export function FloorClient({
             </p>
           )}
           {inProgress.map((order) => (
-            <OrderCard key={order.id} order={order}>
+            <OrderCard key={order.id} order={order} queued={queuedOrderIds.has(order.id)}>
               <Button
                 size="lg"
                 className="h-16 w-full text-lg font-bold"
-                disabled={pending}
+                disabled={pending || queuedOrderIds.has(order.id)}
                 onClick={() => setCompleting(order)}
               >
                 <CheckCircle2 className="h-6 w-6" />
-                Complete Batch
+                {queuedOrderIds.has(order.id) ? 'Queued' : 'Complete Batch'}
               </Button>
             </OrderCard>
           ))}
@@ -196,16 +367,16 @@ export function FloorClient({
             </p>
           )}
           {queue.map((order) => (
-            <OrderCard key={order.id} order={order}>
+            <OrderCard key={order.id} order={order} queued={queuedOrderIds.has(order.id)}>
               <Button
                 size="lg"
                 variant="secondary"
                 className="h-16 w-full text-lg font-bold"
-                disabled={pending}
+                disabled={pending || queuedOrderIds.has(order.id)}
                 onClick={() => start(order)}
               >
                 <Play className="h-6 w-6" />
-                Start Batch
+                {queuedOrderIds.has(order.id) ? 'Queued' : 'Start Batch'}
               </Button>
             </OrderCard>
           ))}
@@ -219,7 +390,15 @@ function orderLabel(order: FloorOrderVM): string {
   return order.items.map((i) => `${i.recipeName} ×${i.batchCount}`).join(', ');
 }
 
-function OrderCard({ order, children }: { order: FloorOrderVM; children: React.ReactNode }) {
+function OrderCard({
+  order,
+  queued,
+  children,
+}: {
+  order: FloorOrderVM;
+  queued?: boolean;
+  children: React.ReactNode;
+}) {
   const shortAny = order.items.some((i) =>
     i.ingredients.some((ing) => ing.availableBase < ing.plannedBase)
   );
@@ -227,12 +406,17 @@ function OrderCard({ order, children }: { order: FloorOrderVM; children: React.R
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-2">
         <p className="text-lg font-bold leading-snug">{orderLabel(order)}</p>
-        {shortAny && (
+        {queued ? (
+          <Badge variant="secondary" className="shrink-0 bg-warning/15 text-warning">
+            <CloudUpload className="mr-1 h-3 w-3" />
+            Queued
+          </Badge>
+        ) : shortAny ? (
           <Badge variant="secondary" className="shrink-0 bg-warning/15 text-warning">
             <AlertTriangle className="mr-1 h-3 w-3" />
             Low stock
           </Badge>
-        )}
+        ) : null}
       </div>
       <div className="mb-4 space-y-2">
         {order.items.map((item) => (
