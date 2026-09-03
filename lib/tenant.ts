@@ -31,6 +31,7 @@ export type TenantContext = {
     name: string;
     slug: string;
     status: string;
+    orderPortalEnabled: boolean;
     plan: {
       code: string;
       name: string;
@@ -66,6 +67,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
           name: true,
           slug: true,
           status: true,
+          orderPortalEnabled: true,
           subscription: {
             select: {
               status: true,
@@ -102,6 +104,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
       name: tenant.name,
       slug: tenant.slug,
       status: tenant.status,
+      orderPortalEnabled: tenant.orderPortalEnabled,
       plan: plan
         ? { code: plan.code, name: plan.name, features: resolvePlanFeatures(plan) }
         : null,

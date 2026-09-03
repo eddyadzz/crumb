@@ -120,6 +120,7 @@ export interface AccountInfo {
   billingInterval: string | null;
   trialEndsAt: string | null;
   trialExpired: boolean;
+  orderPortalEnabled: boolean;
 }
 
 export async function getAccountInfo(): Promise<AccountInfo> {
@@ -140,6 +141,7 @@ export async function getAccountInfo(): Promise<AccountInfo> {
     billingInterval: sub?.billingInterval ?? null,
     trialEndsAt: sub?.trialEndsAt?.toISOString() ?? null,
     trialExpired: ctx.trialExpired,
+    orderPortalEnabled: ctx.tenant.orderPortalEnabled,
   };
 }
 

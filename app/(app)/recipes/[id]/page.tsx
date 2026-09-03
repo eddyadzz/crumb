@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic';
 export default async function RecipeDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const { tenantId } = await getTenantContext();
   const recipe = await prisma.recipe.findUnique({
-    where: { id: params.id, tenantId },
+    where: { id, tenantId },
     include: {
       recipeIngredients: { include: { ingredient: true } },
     },

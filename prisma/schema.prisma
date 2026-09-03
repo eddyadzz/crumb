@@ -143,6 +143,8 @@ model Tenant {
   notifProductionEmail Boolean               @default(true)
   notifBillingEmail    Boolean               @default(true)
   notifTrialEmail      Boolean               @default(true)
+  /** Public order portal: customers submit orders at /order/{slug}. */
+  orderPortalEnabled   Boolean               @default(false)
   users                User[]
   memberships          Membership[]
   invitations          Invitation[]
