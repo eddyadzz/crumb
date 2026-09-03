@@ -1,4 +1,4 @@
-import { getSalesData, getProductOutcomeSummary, getProductProfitability, getBatchVariance, getRecipeVariance, getCostVarianceSummary, getVarianceTrend, getWasteTrend } from '@/lib/queries';
+import { getSalesData, getProductOutcomeSummary, getProductProfitability, getBatchVariance, getRecipeVariance, getCostVarianceSummary, getVarianceTrend, getWasteTrend, getEfficiencyMetrics } from '@/lib/queries';
 import { getTenantContext } from '@/lib/tenant';
 import { ReportsClient } from './reports-client';
 
@@ -19,7 +19,7 @@ function isSameDay(a: Date, b: Date): boolean {
 
 export default async function ReportsPage() {
   const { tenantId } = await getTenantContext();
-  const [sales, outcomeSummary, profitability, batchVariance, recipeVariance, varianceSummary, varianceTrend, wasteTrend] = await Promise.all([
+  const [sales, outcomeSummary, profitability, batchVariance, recipeVariance, varianceSummary, varianceTrend, wasteTrend, efficiency] = await Promise.all([
     getSalesData(tenantId),
     getProductOutcomeSummary(tenantId),
     getProductProfitability(tenantId),
@@ -28,6 +28,7 @@ export default async function ReportsPage() {
     getCostVarianceSummary(tenantId),
     getVarianceTrend(tenantId),
     getWasteTrend(tenantId),
+    getEfficiencyMetrics(tenantId),
   ]);
 
   const today = new Date();
@@ -108,6 +109,7 @@ export default async function ReportsPage() {
         summary: varianceSummary,
         varianceTrend,
         wasteTrend,
+        efficiency,
       }}
     />
   );

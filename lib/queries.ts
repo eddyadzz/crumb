@@ -7,7 +7,11 @@ import {
   computeMarginImpact,
   buildVarianceTrend,
   buildWasteTrend,
+  efficiencyScore,
+  efficiencyBand,
+  annualizeWasteLoss,
   type CostedRow,
+  type EfficiencyBand,
 } from '@/lib/production-variance';
 
 export async function getIngredients(tenantId: string) {
@@ -487,5 +491,157 @@ export async function getCostVarianceSummary(tenantId: string): Promise<CostVari
     expectedProfit: mi.expectedProfit,
     actualProfit: mi.actualProfit,
     marginImpact: mi.impact,
+  };
+}
+
+/* ================= PRODUCTION EFFICIENCY METRICS (Phase I-B Sprint 3) ================= */
+
+export interface RecipeEfficiencyVM {
+  recipeId: string;
+  recipeName: string;
+  batches: number;
+  plannedCost: number;
+  actualCost: number;
+  overrunPct: number;
+  wastePct: number;
+  score: number;
+  band: EfficiencyBand;
+}
+
+export interface EfficiencyMetricsVM {
+  hasData: boolean;
+  score: number;
+  band: EfficiencyBand;
+  avgOverrunPct: number;
+  avgWastePct: number;
+  wasteCostInWindow: number;
+  annualWasteLoss: number;
+  best: { name: string; score: number } | null;
+  worst: { name: string; score: number } | null;
+  recipes: RecipeEfficiencyVM[];
+}
+
+/**
+ * Management health numbers over a rolling window: efficiency score, average
+ * batch overrun, average waste %, annualised waste loss, and a per-recipe
+ * efficiency table. Computed only — no new tables.
+ */
+export async function getEfficiencyMetrics(tenantId: string, days = 30): Promise<EfficiencyMetricsVM> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const [batches, movements] = await Promise.all([
+    getCostVarianceData(tenantId),
+    prisma.productMovement.findMany({
+      where: {
+        product: { tenantId },
+        createdAt: { gte: since },
+      },
+      include: {
+        product: {
+          select: {
+            recipeId: true,
+            recipe: { include: { recipeIngredients: { include: { ingredient: true } } } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  // Batch overrun per recipe (windowed).
+  const byRecipe = new Map<string, { recipeName: string; batches: number; plannedCost: number; actualCost: number }>();
+  for (const b of batches) {
+    if (b.createdAt < since) continue;
+    const s = batchCostSummary(b.rows);
+    const e = byRecipe.get(b.recipeId) ?? {
+      recipeName: b.recipeName,
+      batches: 0,
+      plannedCost: 0,
+      actualCost: 0,
+    };
+    e.batches += 1;
+    e.plannedCost += s.plannedCost;
+    e.actualCost += s.actualCost;
+    byRecipe.set(b.recipeId, e);
+  }
+
+  // Waste per recipe (windowed), costed at recipe cost per unit.
+  const wasteByRecipe = new Map<string, { produced: number; wasted: number; cost: number }>();
+  for (const m of movements) {
+    const e = wasteByRecipe.get(m.product.recipeId) ?? { produced: 0, wasted: 0, cost: 0 };
+    if (m.type === 'PRODUCED') {
+      e.produced += m.quantity;
+    } else if (m.type === 'SPOILED' || m.type === 'GIFTED' || m.type === 'STAFF' || m.type === 'SAMPLE') {
+      e.wasted += m.quantity;
+      e.cost += recipeCostPerServing(m.product.recipe) * m.quantity;
+    }
+    wasteByRecipe.set(m.product.recipeId, e);
+  }
+
+  const recipes: RecipeEfficiencyVM[] = [];
+  const allRecipeNames = new Map(
+    (await prisma.recipe.findMany({ where: { tenantId }, select: { id: true, name: true } })).map((r) => [r.id, r.name])
+  );
+  for (const [recipeId, e] of byRecipe) {
+    const overrunPct = e.plannedCost === 0 ? 0 : ((e.actualCost - e.plannedCost) / e.plannedCost) * 100;
+    const w = wasteByRecipe.get(recipeId);
+    const wastePct = w && w.produced > 0 ? (w.wasted / w.produced) * 100 : 0;
+    const score = efficiencyScore(wastePct, overrunPct);
+    recipes.push({
+      recipeId,
+      recipeName: e.recipeName,
+      batches: e.batches,
+      plannedCost: e.plannedCost,
+      actualCost: e.actualCost,
+      overrunPct,
+      wastePct,
+      score,
+      band: efficiencyBand(score),
+    });
+  }
+  // Also surface recipes that only have waste data (produced but never batched
+  // in-window is impossible for variance, but movement-only recipes still waste).
+  for (const [recipeId, w] of wasteByRecipe) {
+    if (byRecipe.has(recipeId) || w.produced === 0) continue;
+    const wastePct = (w.wasted / w.produced) * 100;
+    const score = efficiencyScore(wastePct, 0);
+    recipes.push({
+      recipeId,
+      recipeName: allRecipeNames.get(recipeId) ?? recipeId,
+      batches: 0,
+      plannedCost: 0,
+      actualCost: 0,
+      overrunPct: 0,
+      wastePct,
+      score,
+      band: efficiencyBand(score),
+    });
+  }
+  recipes.sort((a, b) => b.score - a.score || a.recipeName.localeCompare(b.recipeName));
+
+  const totalPlanned = recipes.reduce((s, r) => s + r.plannedCost, 0);
+  const totalActual = recipes.reduce((s, r) => s + r.actualCost, 0);
+  const totalProduced = [...wasteByRecipe.values()].reduce((s, w) => s + w.produced, 0);
+  const totalWasted = [...wasteByRecipe.values()].reduce((s, w) => s + w.wasted, 0);
+  const wasteCostInWindow = [...wasteByRecipe.values()].reduce((s, w) => s + w.cost, 0);
+
+  const avgOverrunPct = totalPlanned === 0 ? 0 : ((totalActual - totalPlanned) / totalPlanned) * 100;
+  const avgWastePct = totalProduced === 0 ? 0 : (totalWasted / totalProduced) * 100;
+  const hasData = recipes.length > 0;
+  const score = hasData ? efficiencyScore(avgWastePct, avgOverrunPct) : 0;
+
+  return {
+    hasData,
+    score,
+    band: efficiencyBand(score),
+    avgOverrunPct,
+    avgWastePct,
+    wasteCostInWindow,
+    annualWasteLoss: annualizeWasteLoss(wasteCostInWindow, days),
+    best: recipes.length > 0 ? { name: recipes[0].recipeName, score: recipes[0].score } : null,
+    worst:
+      recipes.length > 1
+        ? { name: recipes[recipes.length - 1].recipeName, score: recipes[recipes.length - 1].score }
+        : null,
+    recipes,
   };
 }

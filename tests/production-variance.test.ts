@@ -11,6 +11,9 @@ import {
   buildVarianceTrend,
   buildWasteTrend,
   worstRecipes,
+  efficiencyScore,
+  efficiencyBand,
+  annualizeWasteLoss,
 } from '@/lib/production-variance';
 
 describe('production-variance', () => {
@@ -201,5 +204,34 @@ describe('variance trends', () => {
       2
     );
     expect(ranked.map((r) => r.recipeName)).toEqual(['Croissant', 'Chocolate Cake']);
+  });
+});
+
+describe('production efficiency', () => {
+  it('scores 100 minus waste minus overrun', () => {
+    expect(efficiencyScore(3.2, 1.8)).toBeCloseTo(95.0);
+    expect(efficiencyScore(0, 0)).toBe(100);
+  });
+
+  it('clamps the score to 0..100', () => {
+    expect(efficiencyScore(120, 0)).toBe(0);
+    expect(efficiencyScore(0, 150)).toBe(0);
+    expect(efficiencyScore(-5, -10)).toBe(100);
+  });
+
+  it('bands scores at 95/90/80', () => {
+    expect(efficiencyBand(95)).toBe('Excellent');
+    expect(efficiencyBand(94.9)).toBe('Good');
+    expect(efficiencyBand(90)).toBe('Good');
+    expect(efficiencyBand(89.9)).toBe('Fair');
+    expect(efficiencyBand(80)).toBe('Fair');
+    expect(efficiencyBand(79.9)).toBe('Needs Attention');
+    expect(efficiencyBand(0)).toBe('Needs Attention');
+  });
+
+  it('annualizes a 30-day waste cost by 12 months', () => {
+    expect(annualizeWasteLoss(7200, 30)).toBeCloseTo(86400);
+    expect(annualizeWasteLoss(600, 15)).toBeCloseTo(14400);
+    expect(annualizeWasteLoss(500, 0)).toBe(0);
   });
 });

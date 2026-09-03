@@ -9,6 +9,10 @@ import {
   Scale,
   ChevronDown,
   Recycle,
+  Gauge,
+  Trophy,
+  Percent,
+  CalendarClock,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -132,6 +136,26 @@ type ReportsVM = {
       wasted: number;
       wastePct: number;
     }[];
+    efficiency: {
+      hasData: boolean;
+      score: number;
+      band: string;
+      avgOverrunPct: number;
+      avgWastePct: number;
+      wasteCostInWindow: number;
+      annualWasteLoss: number;
+      best: { name: string; score: number } | null;
+      worst: { name: string; score: number } | null;
+      recipes: {
+        recipeId: string;
+        recipeName: string;
+        batches: number;
+        overrunPct: number;
+        wastePct: number;
+        score: number;
+        band: string;
+      }[];
+    };
   };
 };
 
@@ -153,6 +177,12 @@ const varianceTrendConfig: ChartConfig = {
 const wasteTrendConfig: ChartConfig = {
   wastePct: { label: 'Waste %' },
 };
+
+function bandVariant(band: string): 'success' | 'warning' | 'destructive' | 'default' {
+  if (band === 'Excellent' || band === 'Good') return 'success';
+  if (band === 'Fair') return 'warning';
+  return 'destructive';
+}
 
 export function ReportsClient({ stats, salesTrendData, todaysTransactions, profitability, wasteData, wasteTotals, costVariance }: ReportsVM) {
   return (
@@ -372,7 +402,7 @@ export function ReportsClient({ stats, salesTrendData, todaysTransactions, profi
 }
 
 function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVariance'] }) {
-  const { summary, batchVariance, recipeVariance, varianceTrend, wasteTrend } = costVariance;
+  const { summary, batchVariance, recipeVariance, varianceTrend, wasteTrend, efficiency } = costVariance;
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const varianceBadge = (pct: number, label: string) => (
@@ -568,6 +598,122 @@ function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVarian
           ))}
           {worstRecipes(recipeVariance, 5).length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">No recipe overruns recorded</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Gauge className="h-5 w-5 text-primary" />
+            Production Efficiency (30 Days)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {efficiency.hasData ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatCard
+                  label="Efficiency Score"
+                  value={`${efficiency.score.toFixed(1)}%`}
+                  icon={<Gauge className="h-5 w-5" />}
+                  variant={bandVariant(efficiency.band)}
+                  trend={{ value: efficiency.band, positive: efficiency.score >= 90 }}
+                />
+                <StatCard
+                  label="Avg Batch Overrun"
+                  value={`${efficiency.avgOverrunPct >= 0 ? '+' : ''}${efficiency.avgOverrunPct.toFixed(1)}%`}
+                  icon={<Percent className="h-5 w-5" />}
+                  variant={efficiency.avgOverrunPct > 5 ? 'destructive' : 'default'}
+                />
+                <StatCard
+                  label="Avg Waste %"
+                  value={`${efficiency.avgWastePct.toFixed(1)}%`}
+                  icon={<Recycle className="h-5 w-5" />}
+                  variant={efficiency.avgWastePct > 10 ? 'warning' : 'default'}
+                />
+                <StatCard
+                  label="Est. Annual Waste Loss"
+                  value={formatMVR(efficiency.annualWasteLoss)}
+                  icon={<CalendarClock className="h-5 w-5" />}
+                  variant="destructive"
+                  trend={{ value: `${formatMVR(efficiency.wasteCostInWindow)} in 30d`, positive: false }}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {efficiency.best && (
+                  <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/5 p-4">
+                    <Trophy className="h-6 w-6 shrink-0 text-success" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Best Performer</p>
+                      <p className="truncate text-sm font-semibold">{efficiency.best.name}</p>
+                    </div>
+                    <span className="ml-auto shrink-0 font-display text-xl font-bold text-success">
+                      {efficiency.best.score.toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+                {efficiency.worst && (
+                  <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                    <AlertTriangle className="h-6 w-6 shrink-0 text-destructive" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Needs Attention</p>
+                      <p className="truncate text-sm font-semibold">{efficiency.worst.name}</p>
+                    </div>
+                    <span className="ml-auto shrink-0 font-display text-xl font-bold text-destructive">
+                      {efficiency.worst.score.toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+                      <th className="px-3 py-2 text-left font-medium">Recipe</th>
+                      <th className="px-3 py-2 text-right font-medium">Batches</th>
+                      <th className="px-3 py-2 text-right font-medium">Score</th>
+                      <th className="px-3 py-2 text-right font-medium">Waste %</th>
+                      <th className="px-3 py-2 text-right font-medium">Overrun %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {efficiency.recipes.map((r) => (
+                      <tr key={r.recipeId} className="border-b border-border/60 last:border-0">
+                        <td className="px-3 py-2 font-medium">{r.recipeName}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{r.batches}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              r.band === 'Excellent' && 'bg-success/10 text-success',
+                              r.band === 'Good' && 'bg-success/10 text-success',
+                              r.band === 'Fair' && 'bg-warning/10 text-warning',
+                              r.band === 'Needs Attention' && 'bg-destructive/10 text-destructive'
+                            )}
+                          >
+                            {r.score.toFixed(0)} · {r.band}
+                          </Badge>
+                        </td>
+                        <td className={cn('px-3 py-2 text-right', r.wastePct > 10 ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
+                          {r.wastePct.toFixed(1)}
+                        </td>
+                        <td className={cn('px-3 py-2 text-right', r.overrunPct > 5 ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
+                          {r.overrunPct >= 0 ? '+' : ''}
+                          {r.overrunPct.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No batches or product movements in the last 30 days yet.
+            </p>
           )}
         </CardContent>
       </Card>

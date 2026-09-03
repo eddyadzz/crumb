@@ -331,3 +331,30 @@ export function worstRecipes(
     .sort((a, b) => b.varianceCostPct - a.varianceCostPct || b.costVariance - a.costVariance)
     .slice(0, limit);
 }
+
+/* ================= PRODUCTION EFFICIENCY (Phase I-B Sprint 3) ================= */
+
+/**
+ * Single "health number": 100 - waste% - cost overrun%, clamped to 0..100.
+ * Waste and overrun are both percentages of their own base (produced units and
+ * planned cost respectively), which keeps the score easy to explain.
+ */
+export function efficiencyScore(wastePct: number, overrunPct: number): number {
+  return Math.max(0, Math.min(100, 100 - wastePct - overrunPct));
+}
+
+export type EfficiencyBand = 'Excellent' | 'Good' | 'Fair' | 'Needs Attention';
+
+/** 95+ Excellent, 90-95 Good, 80-90 Fair, <80 Needs Attention. */
+export function efficiencyBand(score: number): EfficiencyBand {
+  if (score >= 95) return 'Excellent';
+  if (score >= 90) return 'Good';
+  if (score >= 80) return 'Fair';
+  return 'Needs Attention';
+}
+
+/** Extrapolate a recent-window waste cost to a year (a 30d window × 12 months). */
+export function annualizeWasteLoss(wasteCostInWindow: number, windowDays = 30): number {
+  if (windowDays <= 0) return 0;
+  return wasteCostInWindow * (360 / windowDays);
+}

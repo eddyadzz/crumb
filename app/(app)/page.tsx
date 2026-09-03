@@ -11,7 +11,7 @@ import {
   ShoppingCart,
   ClipboardList,
   Activity,
-  Scale,
+  Gauge,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { prisma } from '@/lib/prisma';
 import { formatMVR, formatBaseQuantity } from '@/lib/costing';
-import { recipeCostPerServing, getCostVarianceKPI } from '@/lib/queries';
+import { recipeCostPerServing, getEfficiencyMetrics } from '@/lib/queries';
 import { aggregateBatches, forecastRequirements, forecastSummary } from '@/lib/forecast';
 import { listRecentActivity } from '@/lib/actions/activity';
 import { getTenantContext } from '@/lib/tenant';
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders, recentActivity, costVarianceKPI] = await Promise.all([
+  const [sales, products, lowStock, productionOrders, recipes, customerOrders, forecastOrders, recentActivity, efficiency] = await Promise.all([
     prisma.sale.findMany({
       where: { tenantId, createdAt: { gte: startOfToday } },
       include: {
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
       },
     }),
     listRecentActivity(5),
-    getCostVarianceKPI(tenantId),
+    getEfficiencyMetrics(tenantId),
   ]);
 
   // Sales with cost
@@ -235,22 +235,25 @@ export default async function DashboardPage() {
           icon={<AlertTriangle className="h-5 w-5" />}
           variant={lowStockVM.length > 0 ? 'warning' : 'default'}
         />
-        {costVarianceKPI.hasData ? (
+        {efficiency.hasData ? (
           <StatCard
-            label="Cost Variance (30d)"
-            value={`${costVarianceKPI.costVariance >= 0 ? '+' : ''}${costVarianceKPI.varianceCostPct.toFixed(1)}%`}
-            icon={<Scale className="h-5 w-5" />}
-            variant={costVarianceKPI.costVariance > 0 ? 'destructive' : 'success'}
-            trend={{
-              value: `${costVarianceKPI.costVariance >= 0 ? '+' : ''}${formatMVR(costVarianceKPI.costVariance)}`,
-              positive: false,
-            }}
+            label="Efficiency Score"
+            value={`${efficiency.score.toFixed(1)}%`}
+            icon={<Gauge className="h-5 w-5" />}
+            variant={
+              efficiency.band === 'Excellent' || efficiency.band === 'Good'
+                ? 'success'
+                : efficiency.band === 'Fair'
+                  ? 'warning'
+                  : 'destructive'
+            }
+            trend={{ value: efficiency.band, positive: efficiency.score >= 90 }}
           />
         ) : (
           <StatCard
-            label="Cost Variance (30d)"
+            label="Efficiency Score"
             value="—"
-            icon={<Scale className="h-5 w-5" />}
+            icon={<Gauge className="h-5 w-5" />}
             trend={{ value: 'complete a batch', positive: true }}
           />
         )}
