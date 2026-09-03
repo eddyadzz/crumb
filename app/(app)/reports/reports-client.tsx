@@ -6,11 +6,16 @@ import {
   Package,
   AlertTriangle,
   BarChart3,
+  Scale,
+  ChevronDown,
+  Recycle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import {
   Tabs,
   TabsContent,
@@ -64,6 +69,56 @@ type ReportsVM = {
     total: number;
     wastePct: string;
   };
+  costVariance: {
+    batchVariance: {
+      id: string;
+      orderId: string;
+      orderLabel: string;
+      recipeId: string;
+      recipeName: string;
+      productName: string;
+      batchCount: number;
+      createdAt: string;
+      plannedCost: number;
+      actualCost: number;
+      costVariance: number;
+      varianceCostPct: number;
+      ingredients: {
+        ingredientId: string;
+        ingredientName: string;
+        plannedBase: number;
+        actualBase: number;
+        diffBase: number;
+        variancePct: number;
+        costPerBase: number;
+        plannedCost: number;
+        actualCost: number;
+        costVariance: number;
+      }[];
+    }[];
+    recipeVariance: {
+      recipeId: string;
+      recipeName: string;
+      productName: string;
+      batches: number;
+      plannedCost: number;
+      actualCost: number;
+      costVariance: number;
+      varianceCostPct: number;
+      wastePct: number;
+    }[];
+    summary: {
+      batches: number;
+      plannedCost: number;
+      actualCost: number;
+      costVariance: number;
+      varianceCostPct: number;
+      estimatedRevenue: number;
+      expectedProfit: number;
+      actualProfit: number;
+      marginImpact: number;
+    };
+  };
 };
 
 const revenueConfig: ChartConfig = {
@@ -77,7 +132,7 @@ const wasteConfig: ChartConfig = {
   gifted: { label: 'Gifted', color: 'hsl(var(--chart-3))' },
 };
 
-export function ReportsClient({ stats, salesTrendData, todaysTransactions, profitability, wasteData, wasteTotals }: ReportsVM) {
+export function ReportsClient({ stats, salesTrendData, todaysTransactions, profitability, wasteData, wasteTotals, costVariance }: ReportsVM) {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
       <PageHeader title="Reports" description="Track sales, profit, and waste" />
@@ -100,6 +155,7 @@ export function ReportsClient({ stats, salesTrendData, todaysTransactions, profi
           <TabsTrigger value="sales" className="flex-1">Sales</TabsTrigger>
           <TabsTrigger value="profit" className="flex-1">Profit</TabsTrigger>
           <TabsTrigger value="waste" className="flex-1">Waste</TabsTrigger>
+          <TabsTrigger value="variance" className="flex-1">Cost Variance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sales" className="space-y-4">
@@ -286,7 +342,270 @@ export function ReportsClient({ stats, salesTrendData, todaysTransactions, profi
             </CardContent>
           </Card>
         </TabsContent>
+
+        <CostVarianceTab costVariance={costVariance} />
       </Tabs>
     </div>
+  );
+}
+
+function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVariance'] }) {
+  const { summary, batchVariance, recipeVariance } = costVariance;
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const varianceBadge = (pct: number, label: string) => (
+    <Badge
+      variant="secondary"
+      className={
+        pct <= 0
+          ? 'bg-success/10 text-success'
+          : 'bg-destructive/10 text-destructive'
+      }
+    >
+      {pct >= 0 ? '+' : ''}
+      {pct.toFixed(1)}% {label}
+    </Badge>
+  );
+
+  if (summary.batches === 0) {
+    return (
+      <TabsContent value="variance" className="space-y-4">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Scale className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-sm font-medium">No completed batches yet</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Complete a production batch in the Floor and Crumb will report
+              planned vs actual ingredient cost and where profit went.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    );
+  }
+
+  return (
+    <TabsContent value="variance" className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Planned Cost"
+          value={formatMVR(summary.plannedCost)}
+          icon={<DollarSign className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Actual Cost"
+          value={formatMVR(summary.actualCost)}
+          icon={<BarChart3 className="h-5 w-5" />}
+          variant={summary.actualCost > summary.plannedCost ? 'destructive' : 'success'}
+        />
+        <StatCard
+          label="Cost Variance"
+          value={`${summary.costVariance >= 0 ? '+' : ''}${formatMVR(summary.costVariance)}`}
+          icon={<Scale className="h-5 w-5" />}
+          variant={summary.costVariance > 0 ? 'destructive' : 'success'}
+          trend={{ value: `${Math.abs(summary.varianceCostPct).toFixed(1)}%`, positive: summary.varianceCostPct <= 0 }}
+        />
+        <StatCard
+          label="Margin Impact"
+          value={`${summary.marginImpact >= 0 ? '+' : ''}${formatMVR(summary.marginImpact)}`}
+          icon={<TrendingUp className="h-5 w-5" />}
+          variant={summary.marginImpact >= 0 ? 'success' : 'destructive'}
+          trend={{
+            value: summary.marginImpact >= 0 ? 'better than expected' : 'profit lost',
+            positive: summary.marginImpact >= 0,
+          }}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Planned vs Actual Cost</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Estimated output value</span>
+                <span className="font-medium">{formatMVR(summary.estimatedRevenue)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Expected profit</span>
+                <span className="font-medium text-success">{formatMVR(summary.expectedProfit)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Actual profit</span>
+                <span className="font-medium">{formatMVR(summary.actualProfit)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Margin Impact
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Had every batch run exactly to plan you would have kept{' '}
+              <span className="font-medium text-success">{formatMVR(summary.expectedProfit)}</span>.
+            </p>
+            <p className="text-muted-foreground">
+              Recorded usage left you with{' '}
+              <span className="font-medium">{formatMVR(summary.actualProfit)}</span>.
+            </p>
+            <p
+              className={cn(
+                'font-display text-lg font-bold',
+                summary.marginImpact >= 0 ? 'text-success' : 'text-destructive'
+              )}
+            >
+              {summary.marginImpact >= 0 ? '+' : ''}
+              {formatMVR(summary.marginImpact)} {summary.marginImpact >= 0 ? 'gained' : 'lost'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recipe Variance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {recipeVariance.map((r) => (
+            <div key={r.recipeId} className="rounded-xl border border-border p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{r.recipeName}</p>
+                  <p className="text-xs text-muted-foreground">{r.batches} batch{r.batches > 1 ? 'es' : ''}</p>
+                </div>
+                {varianceBadge(r.varianceCostPct, 'cost')}
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Planned</p>
+                  <p className="font-medium">{formatMVR(r.plannedCost)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Actual</p>
+                  <p className="font-medium">{formatMVR(r.actualCost)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Variance</p>
+                  <p className={cn('font-bold', r.costVariance > 0 ? 'text-destructive' : 'text-success')}>
+                    {r.costVariance >= 0 ? '+' : ''}
+                    {formatMVR(r.costVariance)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Waste</p>
+                  <p className={cn('font-bold', r.wastePct > 10 ? 'text-destructive' : 'text-muted-foreground')}>
+                    {r.wastePct.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+              {r.wastePct > 10 && r.varianceCostPct > 0 && (
+                <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-destructive/5 p-2 text-xs text-destructive">
+                  <Recycle className="h-3.5 w-3.5" />
+                  High waste ({r.wastePct.toFixed(0)}%) compounds an over-budget recipe — look at both together.
+                </p>
+              )}
+            </div>
+          ))}
+          {recipeVariance.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">No recipe data yet</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Batch Variance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {batchVariance.map((b) => (
+            <div key={b.id} className="overflow-hidden rounded-xl border border-border">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 p-3 text-left"
+                onClick={() => setExpanded(expanded === b.id ? null : b.id)}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {b.recipeName} — {b.orderLabel} · {b.batchCount}×
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(b.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={cn('text-sm font-bold', b.costVariance > 0 ? 'text-destructive' : 'text-success')}>
+                    {b.costVariance >= 0 ? '+' : ''}
+                    {formatMVR(b.costVariance)}
+                  </span>
+                  <ChevronDown
+                    className={cn('h-4 w-4 text-muted-foreground transition-transform', expanded === b.id && 'rotate-180')}
+                  />
+                </div>
+              </button>
+              {expanded === b.id && (
+                <div className="border-t border-border bg-muted/30 p-3">
+                  <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">Planned</p>
+                      <p className="font-medium">{formatMVR(b.plannedCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Actual</p>
+                      <p className="font-medium">{formatMVR(b.actualCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Variance</p>
+                      <p className={cn('font-bold', b.costVariance > 0 ? 'text-destructive' : 'text-success')}>
+                        {b.varianceCostPct >= 0 ? '+' : ''}
+                        {b.varianceCostPct.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="pb-1 text-left font-medium">Ingredient</th>
+                        <th className="pb-1 text-right font-medium">Planned</th>
+                        <th className="pb-1 text-right font-medium">Actual</th>
+                        <th className="pb-1 text-right font-medium">Variance</th>
+                        <th className="pb-1 text-right font-medium">Cost Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {b.ingredients.map((ing) => (
+                        <tr key={ing.ingredientId} className="border-t border-border/60">
+                          <td className="py-1.5">{ing.ingredientName}</td>
+                          <td className="py-1.5 text-right">{ing.plannedBase.toFixed(1)}</td>
+                          <td className="py-1.5 text-right">{ing.actualBase.toFixed(1)}</td>
+                          <td className={cn('py-1.5 text-right font-medium', ing.variancePct > 0 ? 'text-destructive' : 'text-success')}>
+                            {ing.diffBase >= 0 ? '+' : ''}
+                            {ing.diffBase.toFixed(1)}
+                          </td>
+                          <td className={cn('py-1.5 text-right font-medium', ing.costVariance > 0 ? 'text-destructive' : 'text-success')}>
+                            {ing.costVariance >= 0 ? '+' : ''}
+                            {formatMVR(ing.costVariance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+          {batchVariance.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">No batch data yet</p>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 }
