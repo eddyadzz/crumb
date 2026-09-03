@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   CalendarRange,
   ShoppingCart,
@@ -9,6 +10,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   PackageSearch,
+  ListChecks,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -229,10 +231,20 @@ export function ForecastClient({
               <ShoppingCart className="h-5 w-5 text-primary" />
               Forecast Shopping List
             </CardTitle>
-            <Button size="sm" className="gap-1.5" onClick={planShortfallBatches}>
-              <Factory className="h-4 w-4" />
-              Plan Production
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href="/shopping-list">
+                  <ListChecks className="h-4 w-4" />
+                  <span className="hidden sm:inline">Open shopping list</span>
+                  <span className="sm:hidden">List</span>
+                </Link>
+              </Button>
+              <Button size="sm" className="gap-1.5" onClick={planShortfallBatches}>
+                <Factory className="h-4 w-4" />
+                <span className="hidden sm:inline">Plan Production</span>
+                <span className="sm:hidden">Plan</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {shoppingItems.map((r) => (

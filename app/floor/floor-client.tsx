@@ -114,6 +114,39 @@ function makeOpId(): string {
   return `op-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/* ================= LAST SYNCED ================= */
+
+const LAST_SYNC_KEY = 'crumb-floor-last-sync';
+
+function markSynced() {
+  try {
+    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+function lastSyncedAt(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_SYNC_KEY);
+    const t = raw ? Number(raw) : NaN;
+    return Number.isFinite(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+function relativeSyncLabel(ms: number): string {
+  const mins = Math.floor((Date.now() - ms) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins === 1) return '1 min ago';
+  if (mins < 60) return `${mins} mins ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours === 1) return '1 hr ago';
+  if (hours < 24) return `${hours} hrs ago`;
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function FloorClient({
   tenantName,
   orders,
@@ -129,9 +162,14 @@ export function FloorClient({
   const outbox = useSyncExternalStore(subscribeOutbox, getOutboxSnapshot, () => EMPTY_OPS);
   const flushingRef = useRef(false);
   const [clock, setClock] = useState<string | null>(null);
+  const [syncLabel, setSyncLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+    const tick = () => {
+      setClock(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+      const at = lastSyncedAt();
+      setSyncLabel(at === null ? null : relativeSyncLabel(at));
+    };
     tick();
     const t = setInterval(tick, 30_000);
     return () => clearInterval(t);
@@ -166,7 +204,10 @@ export function FloorClient({
       }
       writeOutbox(remaining);
       flushingRef.current = false;
-      if (mutated) router.refresh();
+      if (mutated) {
+        markSynced();
+        router.refresh();
+      }
     });
   }, [router]);
 
@@ -195,6 +236,7 @@ export function FloorClient({
     startTransition(async () => {
       try {
         await startProductionOrder(order.id);
+        markSynced();
         router.refresh();
       } catch (e) {
         if (!navigator.onLine || e instanceof TypeError) {
@@ -223,6 +265,7 @@ export function FloorClient({
         await completeProductionOrder(order.id, actuals);
         setCompleting(null);
         setJustCompleted({ label: orderLabel(order), variance });
+        markSynced();
         router.refresh();
       } catch (e) {
         if (!navigator.onLine || e instanceof TypeError) {
@@ -253,7 +296,10 @@ export function FloorClient({
             <ChefHat className="h-6 w-6 shrink-0 text-primary" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold leading-tight">{tenantName}</p>
-              <p className="text-xs text-muted-foreground">{clock ?? '\u00a0'}</p>
+              <p className="text-xs text-muted-foreground">
+                {clock ?? '\u00a0'}
+                {syncLabel && ` · synced ${syncLabel}`}
+              </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">

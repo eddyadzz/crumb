@@ -157,9 +157,25 @@ export function ScheduleClient({
     return (
       <div
         key={key}
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (view === 'month' && count > 0) {
+            setAnchor(new Date(key + 'T00:00:00'));
+            setView('day');
+          }
+        }}
+        onKeyDown={(e) => {
+          if (view === 'month' && (e.key === 'Enter' || e.key === ' ') && count > 0) {
+            setAnchor(new Date(key + 'T00:00:00'));
+            setView('day');
+          }
+        }}
         className={cn(
-          'flex min-h-[120px] flex-col gap-1.5 rounded-xl border p-2',
-          isToday ? 'border-primary bg-primary/5' : 'border-border'
+          'flex min-h-[72px] flex-col gap-1.5 rounded-xl border p-2 sm:min-h-[120px]',
+          view !== 'month' && 'cursor-default',
+          isToday ? 'border-primary bg-primary/5' : 'border-border',
+          view === 'month' && count > 0 && 'cursor-pointer transition-colors hover:bg-muted/40'
         )}
       >
         <div className="flex items-center justify-between">
@@ -168,7 +184,7 @@ export function ScheduleClient({
           </p>
           {count > 0 && <span className="rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary">{count}</span>}
         </div>
-        <div className="flex flex-1 flex-col gap-1.5">
+        <div className={cn('flex-1 flex-col gap-1.5', view === 'month' ? 'hidden sm:flex' : 'flex')}>
           {list.slice(0, view === 'month' ? 2 : undefined).map((o) => (
             <OrderCard key={o.id} o={o} />
           ))}
@@ -181,7 +197,10 @@ export function ScheduleClient({
               variant="outline"
               className="gap-1.5"
               disabled={planningId === key}
-              onClick={() => planForDay(key)}
+              onClick={(e) => {
+                e.stopPropagation();
+                planForDay(key);
+              }}
             >
               {planningId === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Factory className="h-3.5 w-3.5" />}
               Plan
@@ -251,7 +270,7 @@ export function ScheduleClient({
           })}
         </div>
       ) : (
-        <div className={cn('grid gap-2', view === 'week' ? 'grid-cols-7' : 'grid-cols-1')}>
+        <div className={cn('grid gap-2', view === 'week' ? 'grid-cols-1 sm:grid-cols-7' : 'grid-cols-1')}>
           {windowKeys.map((key) => dayCell(key))}
         </div>
       )}
