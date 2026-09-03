@@ -8,6 +8,9 @@ import {
   batchesToLines,
   aggregateRecipeVariance,
   computeMarginImpact,
+  buildVarianceTrend,
+  buildWasteTrend,
+  worstRecipes,
 } from '@/lib/production-variance';
 
 describe('production-variance', () => {
@@ -131,5 +134,72 @@ describe('cost variance', () => {
     expect(mi.expectedProfit).toBeCloseTo(60);
     expect(mi.actualProfit).toBeCloseTo(51.5);
     expect(mi.impact).toBeCloseTo(-8.5);
+  });
+});
+
+describe('variance trends', () => {
+  const now = new Date(2026, 8, 4); // Sep 4 2026, local
+
+  it('zero-fills the window and buckets batches by day', () => {
+    const trend = buildVarianceTrend(
+      [
+        { createdAt: new Date(2026, 8, 3), plannedCost: 40, actualCost: 48, revenue: 100 },
+        { createdAt: new Date(2026, 8, 3), plannedCost: 10, actualCost: 9, revenue: 30 },
+        { createdAt: new Date(2026, 7, 1), plannedCost: 999, actualCost: 999, revenue: 0 }, // outside window
+      ],
+      5,
+      now
+    );
+    expect(trend).toHaveLength(5);
+    expect(trend[0].day).toBe('Aug 31');
+    expect(trend[4].day).toBe('Sep 4');
+    const sep3 = trend[3];
+    expect(sep3.plannedCost).toBeCloseTo(50);
+    expect(sep3.actualCost).toBeCloseTo(57);
+    expect(sep3.costVariance).toBeCloseTo(7);
+    expect(sep3.marginImpact).toBeCloseTo(-7);
+    expect(trend[0].costVariance).toBe(0);
+  });
+
+  it('accepts ISO strings for createdAt', () => {
+    const trend = buildVarianceTrend(
+      [{ createdAt: '2026-09-04T10:00:00.000Z', plannedCost: 10, actualCost: 12, revenue: 40 }],
+      1,
+      now
+    );
+    // Local day bucketing — the ISO instant is Sep 4 in +05:00 (Maldives).
+    const total = trend.reduce((s, p) => s + p.costVariance, 0);
+    expect(total).toBeCloseTo(2);
+  });
+
+  it('builds waste trend with % per day', () => {
+    const trend = buildWasteTrend(
+      [
+        { createdAt: new Date(2026, 8, 3), type: 'PRODUCED', quantity: 20 },
+        { createdAt: new Date(2026, 8, 3), type: 'SPOILED', quantity: 3 },
+        { createdAt: new Date(2026, 8, 3), type: 'GIFTED', quantity: 1 },
+        { createdAt: new Date(2026, 8, 3), type: 'SOLD', quantity: 12 },
+        { createdAt: new Date(2026, 8, 4), type: 'PRODUCED', quantity: 0 },
+      ],
+      2,
+      now
+    );
+    expect(trend[0].produced).toBe(20);
+    expect(trend[0].wasted).toBe(4);
+    expect(trend[0].wastePct).toBeCloseTo(20);
+    expect(trend[1].wastePct).toBe(0);
+  });
+
+  it('ranks worst recipes first and caps at limit', () => {
+    const ranked = worstRecipes(
+      [
+        { recipeId: 'a', recipeName: 'Croissant', batches: 3, costVariance: 84, plannedCost: 1000, varianceCostPct: 8.4 },
+        { recipeId: 'b', recipeName: 'Donut', batches: 2, costVariance: 96, plannedCost: 2000, varianceCostPct: 4.8 },
+        { recipeId: 'c', recipeName: 'Chocolate Cake', batches: 4, costVariance: 122, plannedCost: 2000, varianceCostPct: 6.1 },
+        { recipeId: 'd', recipeName: 'Bread', batches: 0, costVariance: 999, plannedCost: 0, varianceCostPct: 999 },
+      ],
+      2
+    );
+    expect(ranked.map((r) => r.recipeName)).toEqual(['Croissant', 'Chocolate Cake']);
   });
 });

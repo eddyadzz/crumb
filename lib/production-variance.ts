@@ -214,3 +214,120 @@ export function computeMarginImpact(revenue: number, plannedCost: number, actual
   const actualProfit = revenue - actualCost;
   return { expectedProfit, actualProfit, impact: actualProfit - expectedProfit };
 }
+
+/* ================= TREND BUCKETING (Phase I-B Sprint 2) ================= */
+
+export interface TrendBatchInput {
+  createdAt: Date | string;
+  plannedCost: number;
+  actualCost: number;
+  /** Estimated selling value of the batch output, for margin impact. */
+  revenue: number;
+}
+
+export interface VarianceTrendPoint {
+  /** Day label, e.g. "Sep 1". */
+  day: string;
+  plannedCost: number;
+  actualCost: number;
+  costVariance: number;
+  /** Negative = profit lost that day (mirror of cost variance). */
+  marginImpact: number;
+}
+
+function dayKeyLocal(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Zero-filled daily buckets of planned vs actual cost over a rolling window.
+ * Batches outside the window are skipped. Pure — `now` is injectable for tests.
+ */
+export function buildVarianceTrend(
+  batches: TrendBatchInput[],
+  days: number,
+  now: Date = new Date()
+): VarianceTrendPoint[] {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+  const buckets = new Map<string, VarianceTrendPoint>();
+  const keys: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = dayKeyLocal(d);
+    keys.push(key);
+    buckets.set(key, {
+      day: dayLabel(d),
+      plannedCost: 0,
+      actualCost: 0,
+      costVariance: 0,
+      marginImpact: 0,
+    });
+  }
+  for (const b of batches) {
+    const e = buckets.get(dayKeyLocal(new Date(b.createdAt)));
+    if (!e) continue;
+    e.plannedCost += b.plannedCost;
+    e.actualCost += b.actualCost;
+    e.costVariance += b.actualCost - b.plannedCost;
+    e.marginImpact += (b.revenue - b.actualCost) - (b.revenue - b.plannedCost);
+  }
+  return keys.map((k) => buckets.get(k)!);
+}
+
+export interface WasteMovementInput {
+  createdAt: Date | string;
+  type: string;
+  quantity: number;
+}
+
+export interface WasteTrendPoint {
+  day: string;
+  produced: number;
+  wasted: number;
+  /** wasted / produced * 100; 0 when nothing was produced that day. */
+  wastePct: number;
+}
+
+const WASTE_TYPES = new Set(['SPOILED', 'GIFTED', 'STAFF', 'SAMPLE']);
+
+/** Daily waste % over a rolling window (produced vs spoiled/gifted/staff/sampled). */
+export function buildWasteTrend(
+  movements: WasteMovementInput[],
+  days: number,
+  now: Date = new Date()
+): WasteTrendPoint[] {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+  const buckets = new Map<string, { day: string; produced: number; wasted: number }>();
+  const keys: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = dayKeyLocal(d);
+    keys.push(key);
+    buckets.set(key, { day: dayLabel(d), produced: 0, wasted: 0 });
+  }
+  for (const m of movements) {
+    const e = buckets.get(dayKeyLocal(new Date(m.createdAt)));
+    if (!e) continue;
+    if (m.type === 'PRODUCED') e.produced += m.quantity;
+    else if (WASTE_TYPES.has(m.type)) e.wasted += m.quantity;
+  }
+  return keys.map((k) => {
+    const e = buckets.get(k)!;
+    return { ...e, wastePct: e.produced > 0 ? (e.wasted / e.produced) * 100 : 0 };
+  });
+}
+
+/** Rank recipes by cost-variance %, worst first, limited to `limit`. */
+export function worstRecipes(
+  recipes: { recipeId: string; recipeName: string; batches: number; costVariance: number; plannedCost: number; varianceCostPct: number }[],
+  limit = 5
+) {
+  return [...recipes]
+    .filter((r) => r.batches > 0)
+    .sort((a, b) => b.varianceCostPct - a.varianceCostPct || b.costVariance - a.costVariance)
+    .slice(0, limit);
+}

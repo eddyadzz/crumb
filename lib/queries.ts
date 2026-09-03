@@ -5,6 +5,8 @@ import {
   computeCostedVariance,
   batchCostSummary,
   computeMarginImpact,
+  buildVarianceTrend,
+  buildWasteTrend,
   type CostedRow,
 } from '@/lib/production-variance';
 
@@ -407,21 +409,14 @@ export interface CostVarianceSummaryVM {
   marginImpact: number;
 }
 
-/** Top-level margin-impact summary across every recorded batch. */
-export async function getCostVarianceSummary(tenantId: string): Promise<CostVarianceSummaryVM> {
-  const batches = await getCostVarianceData(tenantId);
-  const plannedCost = batches.reduce((s, b) => s + batchCostSummary(b.rows).plannedCost, 0);
-  const actualCost = batches.reduce((s, b) => s + batchCostSummary(b.rows).actualCost, 0);
-  const costVariance = actualCost - plannedCost;
-
-  // Estimate the selling value of what each batch produced, so we can express
-  // the margin impact in MVR (not just ingredient cost).
-  const recipePrices = await prisma.product.findMany({
+/** Selling price per recipe (first product wins) + servings per recipe. */
+async function recipeRevenueMaps(tenantId: string) {
+  const products = await prisma.product.findMany({
     where: { tenantId },
     select: { recipeId: true, sellingPrice: true },
   });
   const priceByRecipe = new Map<string, number>();
-  for (const p of recipePrices) {
+  for (const p of products) {
     if (!priceByRecipe.has(p.recipeId)) priceByRecipe.set(p.recipeId, p.sellingPrice);
   }
   const recipes = await prisma.recipe.findMany({
@@ -429,12 +424,57 @@ export async function getCostVarianceSummary(tenantId: string): Promise<CostVari
     select: { id: true, servingsProduced: true },
   });
   const servingsByRecipe = new Map(recipes.map((r) => [r.id, r.servingsProduced]));
-  let estimatedRevenue = 0;
-  for (const b of batches) {
-    const servings = servingsByRecipe.get(b.recipeId) ?? 0;
-    const units = b.batchCount * servings;
-    estimatedRevenue += units * (priceByRecipe.get(b.recipeId) ?? 0);
-  }
+  return { priceByRecipe, servingsByRecipe };
+}
+
+function estimatedBatchRevenue(
+  b: { recipeId: string; batchCount: number },
+  priceByRecipe: Map<string, number>,
+  servingsByRecipe: Map<string, number>
+): number {
+  return b.batchCount * (servingsByRecipe.get(b.recipeId) ?? 0) * (priceByRecipe.get(b.recipeId) ?? 0);
+}
+
+/** Daily planned-vs-actual cost + margin impact over a rolling window. */
+export async function getVarianceTrend(tenantId: string, days = 30) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const batches = (await getCostVarianceData(tenantId)).filter(
+    (b) => b.createdAt >= since
+  );
+  const { priceByRecipe, servingsByRecipe } = await recipeRevenueMaps(tenantId);
+  return buildVarianceTrend(
+    batches.map((b) => ({
+      createdAt: b.createdAt,
+      plannedCost: batchCostSummary(b.rows).plannedCost,
+      actualCost: batchCostSummary(b.rows).actualCost,
+      revenue: estimatedBatchRevenue(b, priceByRecipe, servingsByRecipe),
+    })),
+    days
+  );
+}
+
+/** Daily waste % (produced vs spoiled/gifted/staff/sampled) over a rolling window. */
+export async function getWasteTrend(tenantId: string, days = 30) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const movements = await prisma.productMovement.findMany({
+    where: { product: { tenantId }, createdAt: { gte: since } },
+    select: { createdAt: true, type: true, quantity: true },
+  });
+  return buildWasteTrend(movements, days);
+}
+
+/** Top-level margin-impact summary across every recorded batch. */
+export async function getCostVarianceSummary(tenantId: string): Promise<CostVarianceSummaryVM> {
+  const batches = await getCostVarianceData(tenantId);
+  const plannedCost = batches.reduce((s, b) => s + batchCostSummary(b.rows).plannedCost, 0);
+  const actualCost = batches.reduce((s, b) => s + batchCostSummary(b.rows).actualCost, 0);
+  const costVariance = actualCost - plannedCost;
+
+  const { priceByRecipe, servingsByRecipe } = await recipeRevenueMaps(tenantId);
+  const estimatedRevenue = batches.reduce(
+    (s, b) => s + estimatedBatchRevenue(b, priceByRecipe, servingsByRecipe),
+    0
+  );
   const mi = computeMarginImpact(estimatedRevenue, plannedCost, actualCost);
 
   return {

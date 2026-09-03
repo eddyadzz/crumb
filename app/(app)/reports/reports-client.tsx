@@ -41,6 +41,7 @@ import {
   Cell,
 } from 'recharts';
 import { formatMVR } from '@/lib/costing';
+import { worstRecipes } from '@/lib/production-variance';
 
 type ReportsVM = {
   stats: {
@@ -118,6 +119,19 @@ type ReportsVM = {
       actualProfit: number;
       marginImpact: number;
     };
+    varianceTrend: {
+      day: string;
+      plannedCost: number;
+      actualCost: number;
+      costVariance: number;
+      marginImpact: number;
+    }[];
+    wasteTrend: {
+      day: string;
+      produced: number;
+      wasted: number;
+      wastePct: number;
+    }[];
   };
 };
 
@@ -130,6 +144,14 @@ const wasteConfig: ChartConfig = {
   sold: { label: 'Sold', color: 'hsl(var(--chart-2))' },
   spoiled: { label: 'Spoiled', color: 'hsl(var(--chart-4))' },
   gifted: { label: 'Gifted', color: 'hsl(var(--chart-3))' },
+};
+
+const varianceTrendConfig: ChartConfig = {
+  costVariance: { label: 'Cost variance' },
+};
+
+const wasteTrendConfig: ChartConfig = {
+  wastePct: { label: 'Waste %' },
 };
 
 export function ReportsClient({ stats, salesTrendData, todaysTransactions, profitability, wasteData, wasteTotals, costVariance }: ReportsVM) {
@@ -350,7 +372,7 @@ export function ReportsClient({ stats, salesTrendData, todaysTransactions, profi
 }
 
 function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVariance'] }) {
-  const { summary, batchVariance, recipeVariance } = costVariance;
+  const { summary, batchVariance, recipeVariance, varianceTrend, wasteTrend } = costVariance;
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const varianceBadge = (pct: number, label: string) => (
@@ -468,6 +490,87 @@ function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVarian
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cost Variance Trend (30 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={varianceTrendConfig} className="h-[220px] w-full">
+              <BarChart data={varianceTrend}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={6} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} width={44} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="costVariance" radius={[4, 4, 0, 0]}>
+                  {varianceTrend.map((e, i) => (
+                    <Cell key={i} fill={e.costVariance > 0 ? 'hsl(var(--chart-4))' : 'hsl(var(--chart-2))'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Red bars = over planned cost, green = under. Margin impact mirrors this daily.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Waste % Trend (30 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={wasteTrendConfig} className="h-[220px] w-full">
+              <LineChart data={wasteTrend}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={6} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} width={44} unit="%" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line type="monotone" dataKey="wastePct" stroke="hsl(var(--chart-4))" strokeWidth={2.5} dot={{ r: 3 }} />
+              </LineChart>
+            </ChartContainer>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Spoiled, gifted, staff, and samples as a share of what was produced.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recipe Variance Leaderboard</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {worstRecipes(recipeVariance, 5).map((r, i) => (
+            <div key={r.recipeId} className="flex items-center justify-between rounded-xl border border-border p-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className={cn(
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
+                    i === 0 ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{r.recipeName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.batches} batch{r.batches > 1 ? 'es' : ''} · {formatMVR(r.costVariance)} over
+                  </p>
+                </div>
+              </div>
+              <span className={cn('shrink-0 font-display text-sm font-bold', r.varianceCostPct > 0 ? 'text-destructive' : 'text-success')}>
+                {r.varianceCostPct >= 0 ? '+' : ''}
+                {r.varianceCostPct.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+          {worstRecipes(recipeVariance, 5).length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">No recipe overruns recorded</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
