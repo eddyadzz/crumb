@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { orderTotal, canTransition, planFromOrderLines } from '@/lib/orders';
+import { newOrderPublicToken } from '@/lib/public-token';
 import { recordActivity } from '@/lib/activity';
 import { fireWebhook } from '@/lib/webhooks';
 import type { OrderStatus } from '@prisma/client';
@@ -97,6 +98,8 @@ export async function createOrder(input: CreateOrderInput) {
     data: {
       tenantId,
       customerId: input.customerId || null,
+      status: 'PENDING',
+      publicToken: newOrderPublicToken(),
       totalAmount,
       deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
       deliveryTime: input.deliveryTime?.trim() || null,
@@ -121,6 +124,7 @@ export async function createOrder(input: CreateOrderInput) {
       ? await prisma.customer.findUnique({ where: { id: input.customerId }, select: { name: true } })
       : null)?.name ?? null,
     totalAmount: order.totalAmount,
+    publicToken: order.publicToken,
     deliveryDate: order.deliveryDate?.toISOString() ?? null,
     deliveryTime: order.deliveryTime,
     notes: order.notes,
@@ -201,6 +205,7 @@ export interface OrderRow {
   status: OrderStatus;
   customerName: string | null;
   totalAmount: number;
+  publicToken: string | null;
   deliveryDate: string | null;
   deliveryTime: string | null;
   notes: string | null;
@@ -223,6 +228,7 @@ export async function listOrders(): Promise<OrderRow[]> {
     status: o.status,
     customerName: o.customer?.name ?? null,
     totalAmount: o.totalAmount,
+    publicToken: o.publicToken,
     deliveryDate: o.deliveryDate?.toISOString() ?? null,
     deliveryTime: o.deliveryTime,
     notes: o.notes,

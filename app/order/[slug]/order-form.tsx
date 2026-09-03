@@ -31,6 +31,7 @@ export function OrderPortalForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [productId, setProductId] = useState<string>('');
 
   const today = new Date();
@@ -49,8 +50,10 @@ export function OrderPortalForm({
         message: formData.get('message') ?? undefined,
         company: formData.get('company') ?? undefined,
       });
-      if (result.ok) setReference(result.reference);
-      else setError(result.error);
+      if (result.ok) {
+        setReference(result.reference);
+        setToken(result.token);
+      } else setError(result.error);
     });
   };
 
@@ -65,7 +68,12 @@ export function OrderPortalForm({
         <p className="mt-3 text-xs text-muted-foreground">
           Reference: <span className="font-mono font-bold">{reference}</span>
         </p>
-        <Button variant="outline" className="mt-5" onClick={() => setReference(null)}>
+        {token && (
+          <Button asChild variant="outline" className="mt-5">
+            <a href={`/status/${token}`}>Track your order</a>
+          </Button>
+        )}
+        <Button variant="ghost" className="mt-2 block w-full" onClick={() => setReference(null)}>
           Place another order
         </Button>
       </div>

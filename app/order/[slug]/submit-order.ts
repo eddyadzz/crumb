@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { recordActivity } from '@/lib/activity';
 import { fireWebhook } from '@/lib/webhooks';
 import { validatePortalOrder, type PortalOrderInput } from '@/lib/portal';
+import { newOrderPublicToken } from '@/lib/public-token';
 
 /**
  * Public order submission from the customer portal (/order/{slug}). No session
@@ -15,7 +16,7 @@ import { validatePortalOrder, type PortalOrderInput } from '@/lib/portal';
 export async function submitPortalOrder(
   slug: string,
   input: PortalOrderInput
-): Promise<{ ok: true; reference: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; reference: string; token: string } | { ok: false; error: string }> {
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
     select: { id: true, name: true, status: true, orderPortalEnabled: true },
@@ -51,12 +52,14 @@ export async function submitPortalOrder(
     });
   }
 
+  const token = newOrderPublicToken();
   const totalAmount = value.quantity * product.sellingPrice;
   const order = await prisma.customerOrder.create({
     data: {
       tenantId: tenant.id,
       customerId: customer.id,
       status: 'PENDING',
+      publicToken: token,
       totalAmount,
       deliveryDate: value.deliveryDate,
       deliveryTime: value.deliveryTime,
@@ -96,5 +99,5 @@ export async function submitPortalOrder(
     items: [{ productName: product.name, quantity: value.quantity, unitPrice: product.sellingPrice }],
   });
 
-  return { ok: true, reference: order.id.slice(-6).toUpperCase() };
+  return { ok: true, reference: order.id.slice(-6).toUpperCase(), token };
 }

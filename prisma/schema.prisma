@@ -430,6 +430,8 @@ model CustomerOrder {
   customerId   String?
   customer     Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
   status       OrderStatus         @default(PENDING)
+  /** Unguessable token for the public status page: /status/{publicToken}. */
+  publicToken  String?             @unique
   deliveryDate DateTime?
   deliveryTime String?
   notes        String?

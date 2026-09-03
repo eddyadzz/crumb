@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withApiAuth, ApiAuthError, scopeGate } from '@/lib/api-key-auth';
 import { prisma } from '@/lib/prisma';
 import { recordActivity } from '@/lib/activity';
+import { newOrderPublicToken } from '@/lib/public-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
       data: {
         tenantId,
         customerId: body.customerId || null,
+        publicToken: newOrderPublicToken(),
         totalAmount,
         deliveryDate: body.deliveryDate ? new Date(body.deliveryDate) : null,
         deliveryTime: body.deliveryTime?.trim() || null,

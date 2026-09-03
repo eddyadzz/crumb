@@ -34,6 +34,7 @@ export default async function OrdersPage() {
         status: o.status,
         customerName: o.customer?.name ?? null,
         totalAmount: o.totalAmount,
+        publicToken: o.publicToken,
         deliveryDate: o.deliveryDate?.toISOString() ?? null,
         deliveryTime: o.deliveryTime,
         notes: o.notes,

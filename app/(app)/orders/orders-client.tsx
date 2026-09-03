@@ -11,6 +11,8 @@ import {
   Loader2,
   ArrowRight,
   Factory,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +51,7 @@ type OrderVM = {
   status: OrderStatus;
   customerName: string | null;
   totalAmount: number;
+  publicToken: string | null;
   deliveryDate: string | null;
   deliveryTime: string | null;
   notes: string | null;
@@ -92,6 +95,18 @@ export function OrdersClient({
   const [orders, setOrders] = useState(initialOrders);
   const [customers, setCustomers] = useState(initialCustomers);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  const copyStatusLink = async (token: string) => {
+    const url = `${window.location.origin}/status/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.open(url, '_blank');
+    }
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
 
   const nextByDate = [...orders]
     .filter((o) => ['CONFIRMED', 'IN_PRODUCTION', 'READY'].includes(o.status) && o.deliveryDate)
@@ -226,6 +241,21 @@ export function OrdersClient({
                         {next.label}
                       </Button>
                     </div>
+                  )}
+                  {o.publicToken && o.status !== 'CANCELLED' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full gap-2 text-muted-foreground"
+                      onClick={() => copyStatusLink(o.publicToken!)}
+                    >
+                      {copiedToken === o.publicToken ? (
+                        <Check className="h-4 w-4 text-success" />
+                      ) : (
+                        <Share2 className="h-4 w-4" />
+                      )}
+                      {copiedToken === o.publicToken ? 'Status link copied' : 'Copy customer status link'}
+                    </Button>
                   )}
                 </CardContent>
               </Card>

@@ -129,3 +129,32 @@ export function planFromOrderLines(lines: OrderLineToPlan[]): {
   }
   return { recipeItems: [...map.values()] };
 }
+/* ================= STATUS TIMELINE (Phase J-5) ================= */
+
+export interface OrderTimelineStep {
+  key: OrderStatus;
+  label: string;
+  done: boolean;
+}
+
+const TIMELINE_STEPS: Array<{ key: OrderStatus; label: string }> = [
+  { key: 'PENDING', label: 'Order Received' },
+  { key: 'CONFIRMED', label: 'Order Confirmed' },
+  { key: 'IN_PRODUCTION', label: 'In Production' },
+  { key: 'READY', label: 'Ready for Pickup' },
+  { key: 'DELIVERED', label: 'Delivered' },
+];
+
+/**
+ * The customer-facing progress steps for an order's current status. Received
+ * is always done; each later step is done once the status has reached it.
+ * Cancelled orders are handled separately by the caller.
+ */
+export function orderTimeline(status: OrderStatus): OrderTimelineStep[] {
+  const reached = TIMELINE_STEPS.findIndex((s) => s.key === status);
+  return TIMELINE_STEPS.map((s, i) => ({
+    key: s.key,
+    label: s.label,
+    done: i <= reached,
+  }));
+}
