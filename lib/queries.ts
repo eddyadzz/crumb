@@ -15,6 +15,15 @@ import {
   type PurchasePack,
 } from '@/lib/shopping-list';
 import {
+  customerStats,
+  rankCustomers,
+  insightsSummary,
+  customerBadge,
+  type CustomerOrderFact,
+  type CustomerBadge,
+  type InsightsSummary,
+} from '@/lib/customer-insights';
+import {
   computeCostedVariance,
   batchCostSummary,
   computeMarginImpact,
@@ -807,5 +816,70 @@ export async function getShoppingList(tenantId: string): Promise<ShoppingListVM>
     total: shoppingListTotal(rows),
     orderCount: orders.length,
     nextDelivery: orders[0]?.deliveryDate?.toISOString() ?? null,
+  };
+}
+
+/* ================= CUSTOMER INSIGHTS (Phase I-G) ================= */
+
+export interface CustomerInsightVM {
+  customerId: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  orderCount: number;
+  cancelledCount: number;
+  totalRevenue: number;
+  avgOrderValue: number;
+  lastOrderAt: string;
+  daysSinceLastOrder: number;
+  badge: CustomerBadge;
+}
+
+/**
+ * Ranked customer book with loyalty health: revenue, repeat rate, and a
+ * single human label per customer (top / loyal / new / dormant).
+ */
+export async function getCustomerInsights(tenantId: string): Promise<{
+  summary: InsightsSummary;
+  customers: CustomerInsightVM[];
+}> {
+  const customers = await prisma.customer.findMany({
+    where: { tenantId },
+    include: {
+      orders: { select: { customerId: true, totalAmount: true, createdAt: true, status: true } },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const facts: CustomerOrderFact[] = customers.flatMap((c) =>
+    c.orders.map((o) => ({
+      customerId: c.id,
+      totalAmount: o.totalAmount,
+      createdAt: o.createdAt,
+      status: o.status,
+    }))
+  );
+  const stats = customerStats(facts);
+  const summary = insightsSummary(stats);
+  const ranked = rankCustomers(stats);
+
+  return {
+    summary,
+    customers: ranked.map((s, i) => {
+      const c = customers.find((x) => x.id === s.customerId)!;
+      return {
+        customerId: s.customerId,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        orderCount: s.orderCount,
+        cancelledCount: s.cancelledCount,
+        totalRevenue: s.totalRevenue,
+        avgOrderValue: s.avgOrderValue,
+        lastOrderAt: s.lastOrderAt,
+        daysSinceLastOrder: s.daysSinceLastOrder,
+        badge: customerBadge(s, i),
+      };
+    }),
   };
 }

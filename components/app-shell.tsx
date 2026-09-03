@@ -21,6 +21,7 @@ import {
   Activity,
   Tag,
   ListChecks,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -41,6 +42,7 @@ const mainNav = [
 const moreNav = [
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/orders', label: 'Orders', icon: ClipboardList },
+  { href: '/customers', label: 'Customers', icon: Users },
   { href: '/forecast', label: 'Forecast', icon: CalendarRange },
   { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
   { href: '/ingredients', label: 'Ingredients', icon: Carrot },
