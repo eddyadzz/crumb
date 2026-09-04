@@ -38,6 +38,7 @@ import {
   createIngredient,
   adjustStock,
   getMovementsForIngredient,
+  updateIngredientCost,
 } from '@/lib/actions/ingredients';
 
 type IngredientVM = {
@@ -51,6 +52,7 @@ type IngredientVM = {
   reorderLevel: number;
   notes: string | null;
   costPerBaseUnit: number;
+  updatedAt: Date;
 };
 
 type MovementVM = {
@@ -71,6 +73,7 @@ export function IngredientsClient({
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [adjustIng, setAdjustIng] = useState<IngredientVM | null>(null);
+  const [costIng, setCostIng] = useState<IngredientVM | null>(null);
   const [historyIng, setHistoryIng] = useState<IngredientVM | null>(null);
   const [movements, setMovements] = useState<MovementVM[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -122,6 +125,7 @@ export function IngredientsClient({
             key={ing.id}
             ingredient={ing}
             onAdjust={() => setAdjustIng(ing)}
+            onCostEdit={() => setCostIng(ing)}
             onHistory={() => openHistory(ing)}
           />
         ))}
@@ -147,6 +151,15 @@ export function IngredientsClient({
         />
       )}
 
+      {costIng && (
+        <CostDialog
+          ingredient={costIng}
+          open
+          onOpenChange={(v) => !v && setCostIng(null)}
+          onSaved={() => refresh()}
+        />
+      )}
+
       <HistoryDialog
         ingredient={historyIng}
         open={!!historyIng}
@@ -161,10 +174,12 @@ function IngredientCard({
   ingredient,
   onAdjust,
   onHistory,
+  onCostEdit,
 }: {
   ingredient: IngredientVM;
   onAdjust: () => void;
   onHistory: () => void;
+  onCostEdit: () => void;
 }) {
   const isLow = ingredient.availableQuantity <= ingredient.reorderLevel;
 
@@ -220,6 +235,9 @@ function IngredientCard({
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="flex-1" onClick={onAdjust}>
             Adjust
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1" onClick={onCostEdit}>
+            Cost
           </Button>
           <Button variant="ghost" size="sm" onClick={onHistory}>
             <History className="h-4 w-4" />
@@ -534,6 +552,130 @@ function HistoryDialog({
             </div>
           ))}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CostDialog({
+  ingredient,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  ingredient: IngredientVM;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [cost, setCost] = useState(String(ingredient.purchaseCost));
+  const [packQty, setPackQty] = useState(String(ingredient.purchaseQuantity));
+  const [packUnit, setPackUnit] = useState(ingredient.purchaseUnit);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const parsedCost = parseFloat(cost);
+  const parsedQty = parseFloat(packQty);
+  const previewPerBase =
+    Number.isFinite(parsedCost) && Number.isFinite(parsedQty) && parsedQty > 0
+      ? parsedCost / parsedQty
+      : null;
+
+  const handleSave = () => {
+    if (!Number.isFinite(parsedCost) || parsedCost < 0) {
+      setError('Enter a valid cost');
+      return;
+    }
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
+      setError('Pack size must be greater than zero');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateIngredientCost({
+          ingredientId: ingredient.id,
+          purchaseCost: parsedCost,
+          purchaseQuantity: parsedQty,
+          purchaseUnit: packUnit,
+        });
+        onOpenChange(false);
+        onSaved();
+      } catch {
+        setError('Failed to update cost');
+      }
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Update Cost — {ingredient.name}</DialogTitle>
+          <DialogDescription>
+            Future costing, pricing, and variance use the new cost. Existing
+            production records are unchanged.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
+              <Label htmlFor="costPackQty">Pack size</Label>
+              <Input
+                id="costPackQty"
+                type="number"
+                step="any"
+                min="0"
+                value={packQty}
+                onChange={(e) => setPackQty(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="costPackUnit">Pack unit</Label>
+              <Input
+                id="costPackUnit"
+                value={packUnit}
+                onChange={(e) => setPackUnit(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="costValue">Pack cost (MVR)</Label>
+            <Input
+              id="costValue"
+              type="number"
+              step="any"
+              min="0"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+            />
+          </div>
+          {previewPerBase !== null && (
+            <div className="rounded-lg bg-primary/5 p-3 text-center">
+              <p className="text-xs text-muted-foreground">New cost per base unit</p>
+              <p className="font-display text-lg font-bold text-primary">
+                {formatMVR(previewPerBase)}/{ingredient.baseUnit}
+              </p>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Last updated:{' '}
+            {new Date(ingredient.updatedAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={pending}>
+            {pending ? 'Saving...' : 'Update Cost'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

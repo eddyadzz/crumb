@@ -11,15 +11,6 @@ import { UsageEventType } from '@/lib/usage-events';
 import { fireWebhook } from '@/lib/webhooks';
 import type { OrderStatus } from '@prisma/client';
 
-export const ORDER_STATUSES: OrderStatus[] = [
-  'PENDING',
-  'CONFIRMED',
-  'IN_PRODUCTION',
-  'READY',
-  'DELIVERED',
-  'CANCELLED',
-];
-
 export interface CustomerRow {
   id: string;
   name: string;

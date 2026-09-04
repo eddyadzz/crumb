@@ -88,3 +88,43 @@ export async function adjustStock(input: AdjustStockInput) {
   revalidatePath('/');
   return { newQuantity };
 }
+export interface UpdateIngredientCostInput {
+  ingredientId: string;
+  purchaseCost: number;
+  purchaseQuantity: number;
+  purchaseUnit: string;
+}
+
+/**
+ * Update an ingredient's current cost basis (pack size + price).
+ * Future costing/pricing/variance use the new cost; stock is untouched.
+ */
+export async function updateIngredientCost(input: UpdateIngredientCostInput) {
+  const { tenantId } = await requireTenantWritable();
+  if (!Number.isFinite(input.purchaseCost) || input.purchaseCost < 0) {
+    throw new Error('Cost must be zero or more');
+  }
+  if (!Number.isFinite(input.purchaseQuantity) || input.purchaseQuantity <= 0) {
+    throw new Error('Pack size must be greater than zero');
+  }
+  if (!input.purchaseUnit.trim()) throw new Error('Pack unit is required');
+
+  const ingredient = await prisma.ingredient.findUnique({
+    where: { id: input.ingredientId, tenantId },
+  });
+  if (!ingredient) throw new Error('Ingredient not found');
+
+  await prisma.ingredient.update({
+    where: { id: input.ingredientId },
+    data: {
+      purchaseCost: input.purchaseCost,
+      purchaseQuantity: input.purchaseQuantity,
+      purchaseUnit: input.purchaseUnit.trim(),
+    },
+  });
+
+  revalidatePath('/ingredients');
+  revalidatePath('/');
+  revalidatePath('/pricing');
+  return { costPerBaseUnit: input.purchaseCost / input.purchaseQuantity };
+}
