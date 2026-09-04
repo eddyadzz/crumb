@@ -605,3 +605,118 @@ export async function adminTogglePaymentMethod(id: string) {
     data: { active: !m.active },
   });
 }
+// --- Beta usage overview (Phase K-0) ---
+
+export interface BetaUsageEventRow {
+  eventType: string;
+  last7: number;
+  last30: number;
+  allTime: number;
+}
+
+export interface BetaUsageTenantRow {
+  tenantId: string;
+  tenantName: string;
+  status: string;
+  events30: number;
+  lastActivityAt: string | null;
+}
+
+export interface BetaUsageOverview {
+  activeTenants7: number;
+  activeTenants30: number;
+  totalTenants: number;
+  eventRows: BetaUsageEventRow[];
+  tenantRows: BetaUsageTenantRow[];
+}
+
+/** Headline event types shown on the beta-usage page. */
+const BETA_EVENT_TYPES = [
+  'order_created',
+  'recipe_created',
+  'floor_session_started',
+  'shopping_list_generated',
+  'portal_order_received',
+  'status_page_viewed',
+  'production_started',
+  'production_completed',
+  'offline_sync_completed',
+] as const;
+
+export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
+  await requirePlatformAdmin();
+
+  const now = Date.now();
+  const since7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const since30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+  const [byType7, byType30, byTypeAll, tenantGroups7, tenantGroups, tenants] = await Promise.all([
+    prisma.usageEvent.groupBy({
+      by: ['eventType'],
+      where: { createdAt: { gte: since7 } },
+      _count: { _all: true },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ['eventType'],
+      where: { createdAt: { gte: since30 } },
+      _count: { _all: true },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ['eventType'],
+      _count: { _all: true },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ['tenantId'],
+      where: { createdAt: { gte: since7 } },
+      _count: { _all: true },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ['tenantId'],
+      where: { createdAt: { gte: since30 } },
+      _count: { _all: true },
+    }),
+    prisma.tenant.findMany({
+      select: { id: true, name: true, status: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
+
+  const count7 = new Map(byType7.map((r) => [r.eventType, r._count._all]));
+  const count30 = new Map(byType30.map((r) => [r.eventType, r._count._all]));
+  const countAll = new Map(byTypeAll.map((r) => [r.eventType, r._count._all]));
+
+  const eventRows: BetaUsageEventRow[] = BETA_EVENT_TYPES.map((eventType) => ({
+    eventType,
+    last7: count7.get(eventType) ?? 0,
+    last30: count30.get(eventType) ?? 0,
+    allTime: countAll.get(eventType) ?? 0,
+  }));
+
+  const eventsByTenant = new Map(tenantGroups.map((g) => [g.tenantId, g._count._all]));
+  const lastActivityByTenant = new Map<string, Date>();
+  const lastActivity = await prisma.usageEvent.groupBy({
+    by: ['tenantId'],
+    _max: { createdAt: true },
+  });
+  for (const r of lastActivity) {
+    if (r._max.createdAt) lastActivityByTenant.set(r.tenantId, r._max.createdAt);
+  }
+
+  const tenantRows: BetaUsageTenantRow[] = tenants
+    .map((t) => ({
+      tenantId: t.id,
+      tenantName: t.name,
+      status: t.status,
+      events30: eventsByTenant.get(t.id) ?? 0,
+      lastActivityAt: lastActivityByTenant.get(t.id)?.toISOString() ?? null,
+    }))
+    .sort((a, b) => b.events30 - a.events30 || a.tenantName.localeCompare(b.tenantName));
+
+  return {
+    activeTenants7: tenantGroups7.length,
+    activeTenants30: tenantGroups.length,
+    totalTenants: tenants.length,
+    eventRows,
+    tenantRows,
+  };
+}
