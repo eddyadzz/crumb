@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getTenantContext } from '@/lib/tenant';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { aggregateBatches, type BatchPlan } from '@/lib/forecast';
 import { ForecastClient } from './forecast-client';
 
@@ -13,6 +15,11 @@ interface OrderForecast {
 
 export default async function ForecastPage() {
   const { tenantId } = await getTenantContext();
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.FORECAST_VIEWED,
+    route: '/forecast',
+  });
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());

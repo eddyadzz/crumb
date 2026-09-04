@@ -16,6 +16,7 @@ import {
   startProductionOrder,
   completeProductionOrder,
 } from '@/lib/actions/production';
+import { recordOfflineSyncCompleted } from '@/lib/actions/usage';
 
 /**
  * Shared offline-queue replay used by Floor Mode and the Sync Center:
@@ -87,6 +88,11 @@ export function useOutboxSync(opts?: { onUploaded?: (op: OutboxOp) => void }) {
         }
         if (remaining.length === 0 && (uploaded > 0 || conflicts > 0)) {
           recordSyncEvent('synced', 'Completed sync — all changes uploaded');
+          try {
+            await recordOfflineSyncCompleted(uploaded);
+          } catch {
+            // instrumentation must never break the sync path
+          }
         }
         if (uploaded > 0 || conflicts > 0) router.refresh();
       });

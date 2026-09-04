@@ -1,4 +1,6 @@
 import { getTenantContext } from '@/lib/tenant';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { getPricingAssistant } from '@/lib/queries';
 import { formatMVR } from '@/lib/costing';
 import { PageHeader } from '@/components/page-header';
@@ -11,6 +13,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function PricingPage() {
   const { tenantId } = await getTenantContext();
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.PRICE_CALCULATED,
+    route: '/pricing',
+  });
   const recipes = await getPricingAssistant(tenantId);
 
   const belowTarget = recipes.filter((r) => r.verdict === 'below-target');

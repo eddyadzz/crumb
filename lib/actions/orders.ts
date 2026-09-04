@@ -6,6 +6,8 @@ import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { orderTotal, canTransition, planFromOrderLines } from '@/lib/orders';
 import { newOrderPublicToken } from '@/lib/public-token';
 import { recordActivity } from '@/lib/activity';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { fireWebhook } from '@/lib/webhooks';
 import type { OrderStatus } from '@prisma/client';
 
@@ -152,6 +154,13 @@ export async function createOrder(input: CreateOrderInput) {
     totalAmount: vm.totalAmount,
     customerName: vm.customerName,
     items: vm.items.map((i) => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice })),
+  });
+
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.ORDER_CREATED,
+    route: '/orders',
+    metadata: { itemCount: vm.items.length },
   });
 
   revalidatePath('/orders');

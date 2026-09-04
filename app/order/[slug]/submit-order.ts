@@ -3,6 +3,8 @@
 import { prisma } from '@/lib/prisma';
 import { recordActivity } from '@/lib/activity';
 import { fireWebhook } from '@/lib/webhooks';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { validatePortalOrder, type PortalOrderInput } from '@/lib/portal';
 import { newOrderPublicToken } from '@/lib/public-token';
 
@@ -97,6 +99,13 @@ export async function submitPortalOrder(
     customerName: value.name,
     totalAmount,
     items: [{ productName: product.name, quantity: value.quantity, unitPrice: product.sellingPrice }],
+  });
+
+  await recordUsage({
+    tenantId: tenant.id,
+    eventType: UsageEventType.PORTAL_ORDER_RECEIVED,
+    route: `/order/${slug}`,
+    metadata: { itemCount: 1, quantity: value.quantity },
   });
 
   return { ok: true, reference: order.id.slice(-6).toUpperCase(), token };

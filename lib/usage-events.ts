@@ -15,6 +15,7 @@ export const UsageEventType = {
   PORTAL_ORDER_RECEIVED: 'portal_order_received',
   STATUS_PAGE_VIEWED: 'status_page_viewed',
   OFFLINE_SYNC_COMPLETED: 'offline_sync_completed',
+  FLOOR_SESSION_STARTED: 'floor_session_started',
 } as const;
 
 export type UsageEventTypeValue = (typeof UsageEventType)[keyof typeof UsageEventType];

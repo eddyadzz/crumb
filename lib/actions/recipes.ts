@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 
 export interface CreateRecipeInput {
   name: string;
@@ -29,6 +31,12 @@ export async function createRecipe(input: CreateRecipeInput) {
       utilityCost: input.utilityCost,
       laborCost: input.laborCost,
     },
+  });
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.RECIPE_CREATED,
+    route: '/recipes',
+    metadata: { recipeId: recipe.id },
   });
   revalidatePath('/recipes');
   revalidatePath('/');

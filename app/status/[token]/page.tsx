@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { CheckCircle2, Circle, XCircle, Phone, MessageCircle, ChefHat } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { orderTimeline } from '@/lib/orders';
 import { isValidOrderPublicToken } from '@/lib/public-token';
 
@@ -28,6 +30,13 @@ export default async function OrderStatusPage({
     },
   });
   if (!order) notFound();
+
+  await recordUsage({
+    tenantId: order.tenantId,
+    eventType: UsageEventType.STATUS_PAGE_VIEWED,
+    route: `/status/${token}`,
+    metadata: { orderId: order.id },
+  });
 
   const cancelled = order.status === 'CANCELLED';
   const steps = cancelled ? null : orderTimeline(order.status);

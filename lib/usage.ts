@@ -59,9 +59,7 @@ export async function getUsageSummary(
   opts: { since?: Date } = {},
 ): Promise<UsageSummary> {
   const since = opts.since ?? null;
-  const where = since
-    ? { tenantId, createdAt: { gte: since } }
-    : { tenantId };
+  const where = since ? { tenantId, createdAt: { gte: since } } : { tenantId };
 
   const byRoute = await prisma.usageEvent.groupBy({
     by: ['route'],

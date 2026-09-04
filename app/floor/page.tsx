@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { getTenantContext } from '@/lib/tenant';
 import { convertToBase } from '@/lib/costing';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 import { FloorClient, type FloorOrderVM } from './floor-client';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +13,13 @@ export const metadata = {
 
 /** Dedicated touch-first production screen, rendered without the app shell. */
 export default async function FloorPage() {
-  const { tenantId, tenant } = await getTenantContext();
+  const { tenantId, tenant, userId } = await getTenantContext();
+  await recordUsage({
+    tenantId,
+    userId,
+    eventType: UsageEventType.FLOOR_SESSION_STARTED,
+    route: '/floor',
+  });
 
   const orders = await prisma.productionOrder.findMany({
     where: { tenantId, status: { in: ['PLANNED', 'IN_PROGRESS'] } },

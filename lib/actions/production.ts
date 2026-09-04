@@ -7,6 +7,8 @@ import { convertToBase } from '@/lib/costing';
 import { blockForShortage } from '@/lib/stock';
 import { recordActivity } from '@/lib/activity';
 import { fireWebhook } from '@/lib/webhooks';
+import { recordUsage } from '@/lib/usage';
+import { UsageEventType } from '@/lib/usage-events';
 
 export interface CreateProductionOrderInput {
   items: { recipeId: string; batchCount: number }[];
@@ -75,6 +77,12 @@ export async function startProductionOrder(orderId: string) {
     title: 'Production started',
     entityType: 'ProductionOrder',
     entityId: orderId,
+  });
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.PRODUCTION_STARTED,
+    route: '/produce',
+    metadata: { productionOrderId: orderId },
   });
   revalidatePath('/produce');
   return true;
@@ -227,6 +235,13 @@ export async function completeProductionOrder(
       });
     }
   }
+
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.PRODUCTION_COMPLETED,
+    route: '/produce',
+    metadata: { productionOrderId: orderId },
+  });
 
   revalidatePath('/produce');
   revalidatePath('/products');
