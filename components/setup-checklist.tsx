@@ -23,12 +23,10 @@ export function SetupChecklist({ progress }: { progress: SetupProgressVM }) {
   const [error, setError] = useState<string | null>(null);
 
   const steps = [
-    { label: 'Add your first ingredient', done: progress.ingredients > 0, href: '/ingredients' },
-    { label: 'Create a recipe', done: progress.recipes > 0, href: '/recipes' },
-    { label: 'Set a selling price', done: progress.pricedProducts > 0, href: '/recipes' },
-    { label: 'Add a customer order', done: progress.customerOrders > 0, href: '/orders' },
-    { label: 'Run and complete a batch', done: progress.completedBatches > 0, href: '/produce' },
-    { label: 'Record a sale', done: progress.sales > 0, href: '/sell' },
+    { label: 'Add your first ingredient', hint: 'Flour, sugar, eggs — whatever you buy most', done: progress.ingredients > 0, href: '/ingredients' },
+    { label: 'Create your first recipe', hint: 'Or paste one you already have', done: progress.recipes > 0, href: '/recipes' },
+    { label: 'Add a customer order', hint: 'Yours, or one from your order page', done: progress.customerOrders > 0, href: '/orders' },
+    { label: 'Bake a batch in Floor Mode', hint: 'Built for flour-covered hands', done: progress.completedBatches > 0, href: '/floor' },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const complete = doneCount === steps.length;
@@ -50,12 +48,14 @@ export function SetupChecklist({ progress }: { progress: SetupProgressVM }) {
         <div>
           <p className="flex items-center gap-2 font-display text-lg font-bold">
             <Sparkles className="h-5 w-5 text-primary" />
-            Get started
+            Let&apos;s get you baking
           </p>
           <p className="text-sm text-muted-foreground">
             {doneCount === 0
-              ? 'Six quick steps to your first profitable batch.'
-              : `${doneCount} of ${steps.length} done — keep going!`}
+              ? 'Four quick steps — most bakers finish in about 10 minutes.'
+              : doneCount === steps.length
+                ? 'Setup complete — time to bake!'
+                : `${doneCount} of ${steps.length} done — almost there.`}
           </p>
         </div>
         <div className="text-right">
@@ -87,7 +87,14 @@ export function SetupChecklist({ progress }: { progress: SetupProgressVM }) {
               ) : (
                 <Circle className="h-5 w-5 shrink-0 text-primary" />
               )}
-              <span className={cn('flex-1', step.done && 'line-through')}>{step.label}</span>
+              <span className="min-w-0 flex-1">
+                <span className={cn('block text-sm font-medium', step.done && 'line-through')}>
+                  {step.label}
+                </span>
+                {!step.done && step.hint && (
+                  <span className="block text-xs text-muted-foreground">{step.hint}</span>
+                )}
+              </span>
               {!step.done && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
             </Link>
           </li>
@@ -107,7 +114,7 @@ export function SetupChecklist({ progress }: { progress: SetupProgressVM }) {
             ) : (
               <Wand2 className="h-4 w-4" />
             )}
-            {pending ? 'Loading sample bakery…' : 'Or load a sample bakery to explore'}
+            {pending ? 'Loading sample bakery…' : 'Rather look around first? Load a sample bakery'}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Ingredients, a recipe, orders, a completed batch, and sales — real numbers everywhere.

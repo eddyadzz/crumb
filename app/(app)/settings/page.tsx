@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([]);
+  const [payerEmail, setPayerEmail] = useState('');
   const [requests, setRequests] = useState<UpgradeRequestInfo[]>([]);
   const [upgradingPlan, setUpgradingPlan] = useState<PlanInfo | null>(null);
   const [upgradeForm, setUpgradeForm] = useState({
@@ -366,23 +367,60 @@ export default function SettingsPage() {
                   </select>
                 </div>
 
-                <div>
-                  <Label htmlFor="reference-number">
-                    Reference number / transaction ID
-                  </Label>
-                  <Input
-                    id="reference-number"
-                    className="mt-1"
-                    placeholder="e.g. transfer reference or TXID"
-                    value={upgradeForm.referenceNumber}
-                    onChange={(e) =>
-                      setUpgradeForm((f) => ({
-                        ...f,
-                        referenceNumber: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                {(() => {
+                  const selected = paymentMethods.find(
+                    (m) => m.id === upgradeForm.paymentMethodId
+                  );
+                  const code = selected?.code ?? 'BANK_TRANSFER';
+                  const refLabels: Record<string, { label: string; placeholder: string }> = {
+                    BANK_TRANSFER: { label: 'Transfer reference', placeholder: 'e.g. BML transfer reference' },
+                    PAYPAL: { label: 'PayPal transaction ID', placeholder: 'e.g. 1AB23456CD789012E' },
+                    SKRILL: { label: 'Skrill transaction ID', placeholder: 'e.g. 1234567890' },
+                    BINANCE: { label: 'Binance order ID / TXID', placeholder: 'e.g. 1234567890123456789' },
+                    USDT_TRC20: { label: 'Transaction hash (TRC20)', placeholder: 'e.g. 0x… or T… tx hash' },
+                    USDT_BEP20: { label: 'Transaction hash (BEP20)', placeholder: 'e.g. 0x… tx hash' },
+                  };
+                  const ref = refLabels[code] ?? {
+                    label: 'Reference number / transaction ID',
+                    placeholder: 'e.g. transfer reference or TXID',
+                  };
+                  return (
+                    <>
+                      {selected?.details && (
+                        <p className="rounded-lg bg-muted/50 p-2 text-xs text-muted-foreground">
+                          {selected.name}: pay to {selected.details}
+                        </p>
+                      )}
+                      <div>
+                        <Label htmlFor="reference-number">{ref.label}</Label>
+                        <Input
+                          id="reference-number"
+                          className="mt-1"
+                          placeholder={ref.placeholder}
+                          value={upgradeForm.referenceNumber}
+                          onChange={(e) =>
+                            setUpgradeForm((f) => ({
+                              ...f,
+                              referenceNumber: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      {(code === 'PAYPAL' || code === 'SKRILL') && (
+                        <div>
+                          <Label htmlFor="payer-email">Your {code === 'PAYPAL' ? 'PayPal' : 'Skrill'} email</Label>
+                          <Input
+                            id="payer-email"
+                            type="email"
+                            placeholder="e.g. you@example.com"
+                            value={payerEmail}
+                            onChange={(e) => setPayerEmail(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <div>
                   <Label>Payment proof (screenshot)</Label>
@@ -470,13 +508,18 @@ export default function SettingsPage() {
                         billingInterval: upgradeForm.billingInterval,
                         referenceNumber: upgradeForm.referenceNumber,
                         proofImage: upgradeForm.proofImage,
-                        notes: upgradeForm.notes,
+                        notes: payerEmail.trim()
+                          ? [upgradeForm.notes, `Payer email: ${payerEmail.trim()}`]
+                              .filter(Boolean)
+                              .join('\n')
+                          : upgradeForm.notes,
                       });
                       if (res.ok) {
                         setUpgradeSuccess(
                           'Upgrade request submitted! We’ll review it and activate your plan shortly.'
                         );
                         setUpgradingPlan(null);
+                        setPayerEmail('');
                         setUpgradeForm({
                           paymentMethodId: '',
                           billingInterval: 'MONTHLY',
