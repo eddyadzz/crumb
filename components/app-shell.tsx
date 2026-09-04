@@ -23,6 +23,7 @@ import {
   ListChecks,
   Users,
   RefreshCcw,
+  Play,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -33,25 +34,28 @@ import { SyncStatusPill } from '@/components/sync-status-pill';
 import { ModeToggle, useUiMode } from '@/components/mode-toggle';
 import { useState } from 'react';
 
+// Bottom bar = the daily loop. Everything else is workflow-ordered in More.
 const mainNav = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/recipes', label: 'Recipes', icon: ChefHat },
+  { href: '/orders', label: 'Orders', icon: ClipboardList },
   { href: '/produce', label: 'Produce', icon: Factory },
   { href: '/sell', label: 'Sell', icon: ShoppingCart },
+  { href: '/recipes', label: 'Recipes', icon: ChefHat },
 ];
 
+// Ordered by how a bakery works: plan -> buy -> make -> price -> customers -> report.
 const moreNav = [
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/orders', label: 'Orders', icon: ClipboardList },
-  { href: '/customers', label: 'Customers', icon: Users },
   { href: '/forecast', label: 'Forecast', icon: CalendarRange },
   { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
-  { href: '/ingredients', label: 'Ingredients', icon: Carrot },
+  { href: '/floor', label: 'Floor Mode', icon: Play },
   { href: '/products', label: 'Products', icon: Package },
+  { href: '/ingredients', label: 'Ingredients', icon: Carrot },
   { href: '/pricing', label: 'Pricing', icon: Tag },
+  { href: '/customers', label: 'Customers', icon: Users },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
   { href: '/sync', label: 'Sync Center', icon: RefreshCcw },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -65,21 +69,22 @@ const byHref = (href: string) => allNav.find((i) => i.href === href)!;
  * power-tool surfaces (Activity, SaaS extras). */
 const simpleMain = [
   byHref('/'),
-  byHref('/recipes'),
   byHref('/orders'),
   byHref('/produce'),
   byHref('/sell'),
+  byHref('/recipes'),
 ];
 const simpleMore = [
-  byHref('/notifications'),
   byHref('/schedule'),
-  byHref('/customers'),
   byHref('/forecast'),
   byHref('/shopping-list'),
-  byHref('/ingredients'),
+  byHref('/floor'),
   byHref('/products'),
+  byHref('/ingredients'),
   byHref('/pricing'),
+  byHref('/customers'),
   byHref('/reports'),
+  byHref('/notifications'),
   byHref('/tools'),
   byHref('/sync'),
   byHref('/settings'),

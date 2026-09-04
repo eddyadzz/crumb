@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { convertToBase, formatMVR, UNIT_OPTIONS } from '@/lib/costing';
+import { convertKitchenUnits, formatMVR, KITCHEN_UNITS } from '@/lib/costing';
 
 export default function KitchenToolsPage() {
   return (
@@ -37,32 +37,31 @@ function UnitConverter() {
   const [toUnit, setToUnit] = useState<string>('g');
 
   const amount = parseFloat(value) || 0;
-  const converted =
-    toUnit === 'g' || toUnit === 'kg'
-      ? convertToBase(amount, fromUnit) * (toUnit === 'kg' ? 0.001 : 1)
-      : toUnit === 'l' || toUnit === 'ml'
-        ? convertToBase(amount, fromUnit) * (toUnit === 'l' ? 0.001 : 1)
-        : amount;
+  const converted = amount > 0 ? convertKitchenUnits(amount, fromUnit, toUnit) : null;
+  const mismatched = amount > 0 && converted === null;
+  const fromLabel = KITCHEN_UNITS.find((u) => u.unit === fromUnit)?.label ?? fromUnit;
+  const toLabel = KITCHEN_UNITS.find((u) => u.unit === toUnit)?.label ?? toUnit;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <ArrowRightLeft className="h-5 w-5 text-primary" />
-          Unit Converter
+          Kitchen Converter
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Value</Label>
-          <Input
-            type="number"
-            placeholder="250"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </div>
-        <div className="grid grid-cols-2 items-end gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Amount</Label>
+            <Input
+              type="number"
+              step="any"
+              placeholder="250"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </div>
           <div className="space-y-2">
             <Label>From</Label>
             <Select value={fromUnit} onValueChange={setFromUnit}>
@@ -70,33 +69,40 @@ function UnitConverter() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {UNIT_OPTIONS.map((u) => (
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>To</Label>
-            <Select value={toUnit} onValueChange={setToUnit}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {UNIT_OPTIONS.map((u) => (
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                {KITCHEN_UNITS.map((u) => (
+                  <SelectItem key={u.unit} value={u.unit}>{u.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         </div>
-        <div className="rounded-xl bg-primary/5 p-4 text-center">
-          <p className="text-xs text-muted-foreground">Result</p>
-          <p className="font-display text-3xl font-bold text-primary">
-            {amount > 0 ? converted.toFixed(3) : '—'}
-            <span className="ml-1 text-base font-normal text-muted-foreground">{toUnit}</span>
-          </p>
+        <div className="space-y-2">
+          <Label>To</Label>
+          <Select value={toUnit} onValueChange={setToUnit}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KITCHEN_UNITS.map((u) => (
+                <SelectItem key={u.unit} value={u.unit}>{u.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+        {mismatched ? (
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-center text-sm text-warning">
+            {fromLabel} and {toLabel} measure different things (weight vs volume) — there is no
+            universal conversion. Convert via the ingredient&apos;s density instead.
+          </div>
+        ) : (
+          <div className="rounded-xl bg-primary/5 p-4 text-center">
+            <p className="text-xs text-muted-foreground">Result</p>
+            <p className="font-display text-3xl font-bold text-primary">
+              {converted !== null && amount > 0 ? converted.toLocaleString('en-US', { maximumFractionDigits: 3 }) : '—'}
+              <span className="ml-1 text-base font-normal text-muted-foreground">{toUnit}</span>
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -159,8 +165,8 @@ function BatchScaler() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  {KITCHEN_UNITS.map((u) => (
+                    <SelectItem key={u.unit} value={u.unit}>{u.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
