@@ -17,8 +17,8 @@ describe('parseRecipeText — quantity-first lines', () => {
     expect(r.ingredients.map((i) => [i.quantity, i.unit])).toEqual([
       [30, 'ml'],
       [5, 'ml'],
-      [224, 'g'],
-      [454, 'g'],
+      [226.8, 'g'],
+      [453.6, 'g'],
     ]);
   });
 });

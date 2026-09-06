@@ -65,14 +65,37 @@ const UNIT_MAP: Record<string, { unit: string; factor: number }> = {
   tsp: { unit: 'ml', factor: 5 },
   teaspoon: { unit: 'ml', factor: 5 },
   teaspoons: { unit: 'ml', factor: 5 },
+  fl_oz: { unit: 'ml', factor: 30 },
+  floz: { unit: 'ml', factor: 30 },
+  fluidounce: { unit: 'ml', factor: 30 },
+  fluidounces: { unit: 'ml', factor: 30 },
+  jigger: { unit: 'ml', factor: 45 },
+  jiggers: { unit: 'ml', factor: 45 },
+  gill: { unit: 'ml', factor: 120 },
+  gills: { unit: 'ml', factor: 120 },
+  pint: { unit: 'ml', factor: 480 },
+  pts: { unit: 'ml', factor: 480 },
+  pints: { unit: 'ml', factor: 480 },
+  qt: { unit: 'ml', factor: 960 },
+  quart: { unit: 'ml', factor: 960 },
+  quarts: { unit: 'ml', factor: 960 },
+  gal: { unit: 'ml', factor: 3840 },
+  gallon: { unit: 'ml', factor: 3840 },
+  gallons: { unit: 'ml', factor: 3840 },
+  pinch: { unit: 'ml', factor: 0.625 },
+  pinches: { unit: 'ml', factor: 0.625 },
+  dash: { unit: 'ml', factor: 0.3125 },
+  dashes: { unit: 'ml', factor: 0.3125 },
+  cl: { unit: 'ml', factor: 10 },
+  dl: { unit: 'ml', factor: 100 },
   // US weight → grams.
-  oz: { unit: 'g', factor: 28 },
-  ounce: { unit: 'g', factor: 28 },
-  ounces: { unit: 'g', factor: 28 },
-  lb: { unit: 'g', factor: 454 },
-  lbs: { unit: 'g', factor: 454 },
-  pound: { unit: 'g', factor: 454 },
-  pounds: { unit: 'g', factor: 454 },
+  oz: { unit: 'g', factor: 28.35 },
+  ounce: { unit: 'g', factor: 28.35 },
+  ounces: { unit: 'g', factor: 28.35 },
+  lb: { unit: 'g', factor: 453.6 },
+  lbs: { unit: 'g', factor: 453.6 },
+  pound: { unit: 'g', factor: 453.6 },
+  pounds: { unit: 'g', factor: 453.6 },
 };
 
 const HEADER_WORDS = new Set([
@@ -91,7 +114,7 @@ const SERVINGS_RE = /^(\d+(?:[.,]\d+)?)\s+(?:servings?|portions?)\b/i;
 
 const AMOUNT_RE =
   String.raw`(?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|a|an)`;
-const UNIT_TOKEN_RE = String.raw`(?:kg|kgs|kilograms?|milliliters?|millilitres?|ml|l|lt|liters?|litres?|g|gr|grams?|pcs?|pieces?|whole|units?|cups?|tbsps?|tbs|tablespoons?|tsp|teaspoons?|oz|ounces?|lbs?|pounds?)`;
+const UNIT_TOKEN_RE = String.raw`(?:kg|kgs|kilograms?|milliliters?|millilitres?|cl|dl|ml|l|lt|liters?|litres?|g|gr|grams?|pcs?|pieces?|whole|units?|cups?|tbsps?|tbs|tablespoons?|tsp|teaspoons?|fl_?oz|fluidounces?|jiggers?|gills?|pts?|pints?|qts?|quarts?|gals?|gallons?|pinch(?:es)?|dash(?:es)?|oz|ounces?|lbs?|pounds?)`;
 
 function cleanLine(line: string): string {
   return line
