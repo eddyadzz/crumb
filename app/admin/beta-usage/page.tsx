@@ -1,4 +1,5 @@
-import { adminGetUsageOverview } from '@/lib/actions/admin';
+import { adminGetUsageOverview, adminListFeedback } from '@/lib/actions/admin';
+import { MessageSquare } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,10 @@ function fmtDate(iso: string | null): string {
 }
 
 export default async function BetaUsagePage() {
-  const overview = await adminGetUsageOverview();
+  const [overview, feedback] = await Promise.all([
+    adminGetUsageOverview(),
+    adminListFeedback(),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 lg:p-8">
@@ -118,6 +122,37 @@ export default async function BetaUsagePage() {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Baker feedback
+        </h2>
+        <div className="space-y-2">
+          {feedback.map((f) => (
+            <div key={f.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{f.tenantName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {f.contactName ?? '—'}
+                    {f.contactEmail ? ` · ${f.contactEmail}` : ''}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  {fmtDate(f.createdAt)}
+                </span>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm">{f.message}</p>
+            </div>
+          ))}
+          {feedback.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              <MessageSquare className="mx-auto mb-2 h-5 w-5" />
+              No feedback yet — it appears here the moment a baker sends one from Settings.
+            </p>
+          )}
         </div>
       </section>
     </div>

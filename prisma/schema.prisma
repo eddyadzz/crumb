@@ -162,6 +162,7 @@ model Tenant {
   apiKeys              ApiKey[]
   webhookEndpoints     WebhookEndpoint[]
   usageEvents          UsageEvent[]
+  feedback             Feedback[]
 
   @@index([status])
 }
@@ -675,4 +676,19 @@ model UsageEvent {
 
   @@index([tenantId, createdAt])
   @@index([eventType, createdAt])
+}
+
+/// Free-form baker feedback submitted from Settings — read in /admin.
+model Feedback {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId       String?
+  contactName  String?
+  contactEmail String?
+  message      String
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([createdAt])
 }

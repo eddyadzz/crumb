@@ -715,3 +715,31 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
     tenantRows,
   };
 }
+
+export interface AdminFeedbackRow {
+  id: string;
+  tenantName: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  message: string;
+  createdAt: string;
+}
+
+export async function adminListFeedback(): Promise<AdminFeedbackRow[]> {
+  await requirePlatformAdmin();
+
+  const rows = await prisma.feedback.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    include: { tenant: { select: { name: true } } },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    tenantName: r.tenant.name,
+    contactName: r.contactName,
+    contactEmail: r.contactEmail,
+    message: r.message,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}

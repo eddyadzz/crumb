@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User,
@@ -15,8 +15,10 @@ import {
   ArrowUpRight,
   ShieldCheck,
   LayoutGrid,
+  MessageSquare,
 } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
+import { submitFeedback } from '@/lib/actions/feedback';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -138,6 +140,8 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      <FeedbackCard />
 
       <Card>
         <CardHeader>
@@ -775,5 +779,60 @@ function NotifToggle({
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
+  );
+}
+
+function FeedbackCard() {
+  const [message, setMessage] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSend = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await submitFeedback(message);
+      if (res.ok) {
+        setSent(true);
+        setMessage('');
+      } else {
+        setError(res.error);
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MessageSquare className="h-5 w-5 text-muted-foreground" />
+          Feedback
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {sent ? (
+          <p className="text-sm text-success">
+            Thank you — your note reached the BoliFlow team. Keep them coming.
+          </p>
+        ) : (
+          <>
+            <Textarea
+              placeholder="What works, what confuses you, what you still do on paper…"
+              rows={3}
+              maxLength={4000}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">Goes straight to the team building Crumb.</p>
+              <Button size="sm" onClick={handleSend} disabled={pending || message.trim().length < 3}>
+                {pending ? 'Sending…' : 'Send feedback'}
+              </Button>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
