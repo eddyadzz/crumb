@@ -11,6 +11,7 @@ import {
   sendWelcomeEmail,
 } from '@/lib/mail';
 import { recordActivity } from '@/lib/activity';
+import { getTenantUsageRows } from '@/lib/usage';
 import { fireWebhook } from '@/lib/webhooks';
 
 export async function adminGetDashboard() {
@@ -619,6 +620,7 @@ export interface BetaUsageTenantRow {
   tenantName: string;
   status: string;
   events30: number;
+  activeDays30: number;
   lastActivityAt: string | null;
 }
 
@@ -650,7 +652,7 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
   const since7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
   const since30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-  const [byType7, byType30, byTypeAll, tenantGroups7, tenantGroups, tenants] = await Promise.all([
+  const [byType7, byType30, byTypeAll, tenantGroups7, tenants] = await Promise.all([
     prisma.usageEvent.groupBy({
       by: ['eventType'],
       where: { createdAt: { gte: since7 } },
@@ -668,11 +670,6 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
     prisma.usageEvent.groupBy({
       by: ['tenantId'],
       where: { createdAt: { gte: since7 } },
-      _count: { _all: true },
-    }),
-    prisma.usageEvent.groupBy({
-      by: ['tenantId'],
-      where: { createdAt: { gte: since30 } },
       _count: { _all: true },
     }),
     prisma.tenant.findMany({
@@ -692,15 +689,12 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
     allTime: countAll.get(eventType) ?? 0,
   }));
 
-  const eventsByTenant = new Map(tenantGroups.map((g) => [g.tenantId, g._count._all]));
-  const lastActivityByTenant = new Map<string, Date>();
-  const lastActivity = await prisma.usageEvent.groupBy({
-    by: ['tenantId'],
-    _max: { createdAt: true },
-  });
-  for (const r of lastActivity) {
-    if (r._max.createdAt) lastActivityByTenant.set(r.tenantId, r._max.createdAt);
-  }
+  const usage30 = await getTenantUsageRows({ since: since30 });
+  const eventsByTenant = new Map(usage30.map((r) => [r.tenantId, r.events]));
+  const activeDaysByTenant = new Map(usage30.map((r) => [r.tenantId, r.activeDays]));
+  const lastActivityByTenant = new Map(
+    usage30.filter((r) => r.lastEventAt).map((r) => [r.tenantId, r.lastEventAt as Date]),
+  );
 
   const tenantRows: BetaUsageTenantRow[] = tenants
     .map((t) => ({
@@ -708,13 +702,14 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
       tenantName: t.name,
       status: t.status,
       events30: eventsByTenant.get(t.id) ?? 0,
+      activeDays30: activeDaysByTenant.get(t.id) ?? 0,
       lastActivityAt: lastActivityByTenant.get(t.id)?.toISOString() ?? null,
     }))
     .sort((a, b) => b.events30 - a.events30 || a.tenantName.localeCompare(b.tenantName));
 
   return {
     activeTenants7: tenantGroups7.length,
-    activeTenants30: tenantGroups.length,
+    activeTenants30: usage30.length,
     totalTenants: tenants.length,
     eventRows,
     tenantRows,

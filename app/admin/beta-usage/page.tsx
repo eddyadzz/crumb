@@ -93,6 +93,7 @@ export default async function BetaUsagePage() {
                 <th className="px-4 py-2 text-left font-medium">Tenant</th>
                 <th className="px-4 py-2 text-left font-medium">Status</th>
                 <th className="px-4 py-2 text-right font-medium">Events (30d)</th>
+                <th className="px-4 py-2 text-right font-medium" title="Distinct days with events in the last 30 days">Days (30d)</th>
                 <th className="px-4 py-2 text-right font-medium">Last activity</th>
               </tr>
             </thead>
@@ -102,6 +103,7 @@ export default async function BetaUsagePage() {
                   <td className="px-4 py-2 font-medium">{t.tenantName}</td>
                   <td className="px-4 py-2 text-muted-foreground">{t.status.toLowerCase()}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{fmt(t.events30)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmt(t.activeDays30)}</td>
                   <td className="px-4 py-2 text-right text-muted-foreground">
                     {fmtDate(t.lastActivityAt)}
                   </td>
@@ -109,7 +111,7 @@ export default async function BetaUsagePage() {
               ))}
               {overview.tenantRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                     No tenants yet
                   </td>
                 </tr>
