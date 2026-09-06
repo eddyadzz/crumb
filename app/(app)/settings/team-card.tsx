@@ -109,14 +109,12 @@ export function TeamCard({ role }: { role: string }) {
                   className="flex items-center justify-between gap-3 px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {m.name}
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{m.name}</span>
                       {m.role === 'OWNER' && (
-                        <Badge variant="secondary" className="ml-2">
-                          Owner
-                        </Badge>
+                        <Badge variant="secondary">Owner</Badge>
                       )}
-                    </p>
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">{m.email}</p>
                   </div>
                   {canManage && m.role !== 'OWNER' ? (

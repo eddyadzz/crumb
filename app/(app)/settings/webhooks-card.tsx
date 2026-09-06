@@ -135,14 +135,12 @@ export function WebhooksCard() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium">
-                        {ep.name}
-                        {!ep.isEnabled && (
-                          <Badge variant="outline" className="ml-2 gap-0.5">
-                            <WebhookOff className="h-3 w-3" /> Disabled
-                          </Badge>
-                        )}
-                      </p>
+                      <span className="truncate text-sm font-medium">{ep.name}</span>
+                      {!ep.isEnabled && (
+                        <Badge variant="outline" className="gap-0.5">
+                          <WebhookOff className="h-3 w-3" /> Disabled
+                        </Badge>
+                      )}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">{ep.url}</p>
                     <p className="truncate text-[11px] text-muted-foreground">

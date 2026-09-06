@@ -251,14 +251,12 @@ export default function SettingsPage() {
                   className="flex items-center justify-between gap-4 rounded-xl border border-border p-4"
                 >
                   <div>
-                    <p className="text-sm font-semibold">
-                      {p.name}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{p.name}</span>
                       {current && (
-                        <Badge variant="secondary" className="ml-2">
-                          Current
-                        </Badge>
+                        <Badge variant="secondary">Current</Badge>
                       )}
-                    </p>
+                    </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       MVR {p.monthlyPrice}/mo or MVR {p.yearlyPrice}/yr
                     </p>
