@@ -350,6 +350,10 @@ model ProductionItemIngredient {
   ingredientName   String
   plannedQuantity  Float
   actualQuantity   Float
+  /// Ingredient cost per base unit at completion time — freezes batch
+  /// history against later price changes. Null on legacy rows (fall back to
+  /// the ingredient's current cost).
+  costPerBase      Float?
 
   @@index([productionItemId])
   @@index([ingredientId])

@@ -228,6 +228,16 @@ function costPerBaseOf(ingredient: {
   return costPerBaseUnit(ingredient);
 }
 
+/** Cost per base unit for a batch snapshot: prefer the cost frozen at
+ * completion time; fall back to the ingredient's current cost for legacy
+ * rows captured before snapshots existed. */
+function snapshotCostPerBase(
+  ia: { costPerBase: number | null },
+  ingredient: { purchaseQuantity: number; purchaseUnit: string; purchaseCost: number },
+): number {
+  return ia.costPerBase ?? costPerBaseOf(ingredient);
+}
+
 /**
  * Load every completed production order's planned-vs-actual usage, costing each
  * snapshot at the ingredient's current purchase cost, and return the per-batch
@@ -263,7 +273,7 @@ export async function getCostVarianceData(tenantId: string) {
   for (const order of orders) {
     for (const item of order.items) {
       const rows = item.ingredientActuals.map((ia) => {
-        const costPerBase = costPerBaseOf(ia.ingredient);
+        const costPerBase = snapshotCostPerBase(ia, ia.ingredient);
         return computeCostedVariance([
           {
             ingredientName: ia.ingredientName,
@@ -303,7 +313,7 @@ export async function getCostVarianceKPI(tenantId: string) {
   for (const order of orders) {
     for (const item of order.items) {
       for (const ia of item.ingredientActuals) {
-        const cp = costPerBaseOf(ia.ingredient);
+        const cp = snapshotCostPerBase(ia, ia.ingredient);
         sumPlanned += ia.plannedQuantity * cp;
         sumActual += ia.actualQuantity * cp;
       }

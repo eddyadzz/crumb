@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireTenantWritable } from '@/lib/tenant';
-import { convertToBase } from '@/lib/costing';
+import { convertToBase, costPerBaseUnit } from '@/lib/costing';
 import { blockForShortage } from '@/lib/stock';
 import { recordActivity } from '@/lib/activity';
 import { fireWebhook } from '@/lib/webhooks';
@@ -170,6 +170,11 @@ export async function completeProductionOrder(
           ingredientName: ingredient.name,
           plannedQuantity: plannedBase,
           actualQuantity: actualBase,
+          costPerBase: costPerBaseUnit({
+            purchaseQuantity: ingredient.purchaseQuantity,
+            purchaseUnit: ingredient.purchaseUnit,
+            purchaseCost: ingredient.purchaseCost,
+          }),
         },
       });
       if (newQty <= ingredient.reorderLevel) {
