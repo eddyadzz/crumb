@@ -1,9 +1,13 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
+  RefreshCcw,
+  FileUp,
+  Check,
+  X,
   Search,
   Carrot,
   AlertTriangle,
@@ -39,7 +43,9 @@ import {
   adjustStock,
   getMovementsForIngredient,
   updateIngredientCost,
+  bulkImportIngredients,
 } from '@/lib/actions/ingredients';
+import { INGREDIENT_SAMPLE, parseBulkIngredients } from '@/lib/ingredient-import';
 
 type IngredientVM = {
   id: string;
@@ -72,6 +78,7 @@ export function IngredientsClient({
   const ingredients = initial;
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [adjustIng, setAdjustIng] = useState<IngredientVM | null>(null);
   const [costIng, setCostIng] = useState<IngredientVM | null>(null);
   const [historyIng, setHistoryIng] = useState<IngredientVM | null>(null);
@@ -101,11 +108,18 @@ export function IngredientsClient({
         title="Ingredients"
         description="Manage your pantry and track costs"
         action={
-          <Button className="gap-2" onClick={() => setAddOpen(true)} disabled={isPending}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Ingredient</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={isPending}>
+              <FileUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Bulk Import</span>
+              <span className="sm:hidden">Import</span>
+            </Button>
+            <Button className="gap-2" onClick={() => setAddOpen(true)} disabled={isPending}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Ingredient</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
         }
       />
 
@@ -140,6 +154,13 @@ export function IngredientsClient({
         open={addOpen}
         onOpenChange={setAddOpen}
         onCreated={() => refresh()}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existingNames={ingredients.map((i) => i.name)}
+        onImported={() => refresh()}
       />
 
       {adjustIng && (
@@ -676,6 +697,179 @@ function CostDialog({
             {pending ? 'Saving...' : 'Update Cost'}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImportDialog({
+  open,
+  onOpenChange,
+  existingNames,
+  onImported,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  existingNames: string[];
+  onImported: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ created: number; updated: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const parsed = useMemo(() => parseBulkIngredients(text), [text]);
+  const valid = parsed.filter((p) => p.valid);
+  const invalid = parsed.filter((p) => !p.valid);
+  const known = useMemo(() => new Set(existingNames.map((n) => n.toLowerCase())), [existingNames]);
+
+  const handleImport = () => {
+    if (valid.length === 0) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        const summary = await bulkImportIngredients(
+          valid.map((p) => ({
+            name: p.name,
+            purchaseQuantity: p.packQuantity,
+            purchaseUnit: p.packUnit,
+            purchaseCost: p.cost,
+            reorderLevel: p.reorderLevel,
+            baseUnit: p.storageUnit,
+            baseQuantity: p.storageQuantity,
+          })),
+        );
+        setResult(summary);
+        setText('');
+        onImported();
+      } catch {
+        setError('Import failed — please try again');
+      }
+    });
+  };
+
+  const close = (v: boolean) => {
+    onOpenChange(v);
+    if (!v) {
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Bulk Import Ingredients</DialogTitle>
+          <DialogDescription>
+            One ingredient per line: <span className="font-mono text-xs">name, pack size, cost</span>
+            {' '}— optional 4th column sets the reorder level. Paste straight from a
+            spreadsheet (tab-separated works too). Known ingredients get their cost
+            updated; new ones are created.
+          </DialogDescription>
+        </DialogHeader>
+
+        {result ? (
+          <div className="space-y-4 py-4 text-center">
+            <p className="font-display text-lg font-bold text-success">
+              {result.created} created · {result.updated} updated
+            </p>
+            <Button variant="outline" onClick={() => close(false)}>
+              Done
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="bulk-paste">Ingredient list</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => setText(INGREDIENT_SAMPLE)}
+                >
+                  <FileUp className="h-3.5 w-3.5" />
+                  Load sample
+                </Button>
+              </div>
+              <Textarea
+                id="bulk-paste"
+                className="min-h-[160px] font-mono text-sm"
+                placeholder={'Flour, 2kg, 85, 1kg\nSugar, 1kg, 45\nEggs, 30pcs, 55'}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </div>
+
+            {parsed.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50 text-muted-foreground">
+                      <th className="px-2 py-1.5 text-left font-medium">Name</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Pack</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Stock unit</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Cost</th>
+                      <th className="px-2 py-1.5 text-right font-medium">/base</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.map((p, i) => (
+                      <tr key={i} className={cn('border-b border-border/60 last:border-0', !p.valid && 'bg-destructive/5')}>
+                        <td className="px-2 py-1.5 font-medium">{p.name || '—'}</td>
+                        <td className="px-2 py-1.5">
+                          {p.valid ? `${p.packQuantity} ${p.packUnit}` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">
+                          {p.valid ? `${p.storageQuantity} ${p.storageUnit}` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {p.valid ? formatMVR(p.cost) : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {p.costPerBase !== null ? formatMVR(p.costPerBase) : '—'}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {!p.valid ? (
+                            <span className="flex items-center gap-1 text-destructive">
+                              <X className="h-3.5 w-3.5" />
+                              {p.error}
+                            </span>
+                          ) : known.has(p.name.toLowerCase()) ? (
+                            <span className="flex items-center gap-1 text-warning">
+                              <RefreshCcw className="h-3.5 w-3.5" />
+                              Updates cost
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-success">
+                              <Check className="h-3.5 w-3.5" />
+                              New
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => close(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleImport} disabled={pending || valid.length === 0}>
+                {pending
+                  ? 'Importing…'
+                  : `Import ${valid.length} ingredient${valid.length === 1 ? '' : 's'}`}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
