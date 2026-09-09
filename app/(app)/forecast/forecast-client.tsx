@@ -182,8 +182,9 @@ export function ForecastClient({
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
               <CalendarRange className="h-7 w-7 text-muted-foreground" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              No orders due in the next {windowDays} days
+            <p className="max-w-sm text-sm text-muted-foreground">
+              No orders due in the next {windowDays} days. Add a customer order — or
+              share your order portal — and this forecast fills itself in.
             </p>
           </CardContent>
         </Card>

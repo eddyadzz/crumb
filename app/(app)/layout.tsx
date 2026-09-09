@@ -1,4 +1,5 @@
 import { AppShell } from '@/components/app-shell';
+import { SampleBanner } from '@/components/sample-banner';
 import { getTenantContext } from '@/lib/tenant';
 
 export default async function AppLayout({
@@ -17,6 +18,7 @@ export default async function AppLayout({
         trialEndsAt: ctx.tenant.subscription?.trialEndsAt?.toISOString() ?? null,
       }}
     >
+      {ctx.tenant.isSample && <SampleBanner />}
       {children}
     </AppShell>
   );

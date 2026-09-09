@@ -145,6 +145,8 @@ model Tenant {
   notifTrialEmail      Boolean               @default(true)
   /** Public order portal: customers submit orders at /order/{slug}. */
   orderPortalEnabled   Boolean               @default(false)
+  /** True when this business is running the demo/sample bakery (banner + reset). */
+  isSample             Boolean               @default(false)
   users                User[]
   memberships          Membership[]
   invitations          Invitation[]

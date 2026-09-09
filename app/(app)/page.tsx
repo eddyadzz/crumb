@@ -273,6 +273,11 @@ export default async function DashboardPage() {
               </div>
             ))
           )}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Why am I seeing this? Alerts come from current stock (reorder levels), confirmed
+            orders due today or tomorrow that have not entered production, and the worst
+            ingredient overruns of the last 30 days.
+          </p>
         </CardContent>
       </Card>
 
@@ -443,9 +448,17 @@ export default async function DashboardPage() {
   );
 }
 
+const MINI_STAT_HELP: Record<string, string> = {
+  Revenue: 'Total walk-in and recorded sales this month.',
+  Profit: 'Revenue minus recipe costs for recorded sales.',
+  Orders: 'Customer orders created this month.',
+  'Repeat customers': 'Customers with more than one order — your regulars.',
+  'Efficiency (30d)': '100 minus waste% minus ingredient overrun%. Higher is better.',
+};
+
 function MiniStat({ label, value, tone }: { label: string; value: string; tone: 'default' | 'success' | 'warning' | 'destructive' }) {
   return (
-    <div className="rounded-xl bg-muted/50 p-3">
+    <div className="rounded-xl bg-muted/50 p-3" title={MINI_STAT_HELP[label]}>
       <p className="truncate text-[11px] text-muted-foreground">{label}</p>
       <p
         className={cn(

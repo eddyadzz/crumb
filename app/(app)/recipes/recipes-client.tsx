@@ -131,9 +131,23 @@ export function RecipesClient({ recipes: initial }: { recipes: RecipeVM[] }) {
           </Link>
         ))}
         {filtered.length === 0 && (
-          <p className="col-span-full py-12 text-center text-sm text-muted-foreground">
-            No recipes found
-          </p>
+          <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center">
+            <p className="text-sm font-semibold">Start by adding your first recipe</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              Once recipes are in, Crumb can calculate costs, suggest prices, plan
+              production, and generate shopping lists automatically.
+            </p>
+            {search ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Nothing matches “{search}” — try a different name.
+              </p>
+            ) : (
+              <Button size="sm" className="mt-4 gap-1.5" onClick={() => setAddOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                Add your first recipe
+              </Button>
+            )}
+          </div>
         )}
       </div>
 

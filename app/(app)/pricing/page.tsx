@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getTenantContext } from '@/lib/tenant';
 import { recordUsage } from '@/lib/usage';
 import { UsageEventType } from '@/lib/usage-events';
@@ -34,10 +35,17 @@ export default async function PricingPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <Tag className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-            <p className="text-sm font-medium">No recipes yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create a recipe with ingredients and Crumb will suggest what to charge.
+            <p className="text-sm font-medium">Pricing suggestions build themselves</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Once your first recipe has ingredients and costs, Crumb prices it —
+              and flags anything selling for less than it should.
             </p>
+            <Link
+              href="/recipes"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+            >
+              Go to recipes
+            </Link>
           </CardContent>
         </Card>
       ) : (

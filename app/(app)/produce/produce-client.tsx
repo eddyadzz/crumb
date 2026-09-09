@@ -328,8 +328,18 @@ export function ProduceClient({
         <TabsContent value="recipes" className="space-y-3">
           {recipes.length === 0 ? (
             <Card>
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                No recipes yet.
+              <CardContent className="py-16 text-center">
+                <p className="text-sm font-semibold">Add recipes to see them here</p>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                  Kitchen cards show every batch in baker-friendly units — plan one
+                  from a confirmed order and it lands here ready for baking day.
+                </p>
+                <a
+                  href="/orders"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-xs font-medium"
+                >
+                  Open orders
+                </a>
               </CardContent>
             </Card>
           ) : (

@@ -181,7 +181,20 @@ export function OrdersClient({
 
         <TabsContent value="orders" className="space-y-3">
           {orders.length === 0 && (
-            <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No customer orders yet</CardContent></Card>
+            <Card><CardContent className="py-12 text-center">
+              <p className="text-sm font-semibold">Start by adding your first customer order</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                Orders flow into the Schedule, Forecast, and Shopping List on their own —
+                or share your public order link and let customers submit them.
+              </p>
+              <a
+                href="/orders?new=1"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add your first order
+              </a>
+            </CardContent></Card>
           )}
           {orders.map((o) => {
             const next = NEXT_ACTION[o.status];

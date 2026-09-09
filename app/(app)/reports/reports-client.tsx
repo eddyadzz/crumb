@@ -322,9 +322,13 @@ export function ReportsClient({ stats, salesTrendData, todaysTransactions, profi
             </CardHeader>
             <CardContent>
               {wasteTotals.total === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">
-                  No product movements recorded yet
-                </p>
+                <div className="py-10 text-center">
+                  <p className="text-sm font-semibold">Outcomes appear as you move product</p>
+                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                    Log Produced, Sold, Spoiled, Gifted, or Staff use from the Products
+                    screen — Crumb turns the history into this waste picture.
+                  </p>
+                </div>
               ) : (
                 <>
                   <ChartContainer config={wasteConfig} className="mx-auto h-[250px]">
@@ -469,6 +473,16 @@ function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVarian
         />
       </div>
 
+      <p className="rounded-xl bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">How to read these:</span>{' '}
+        <span className="font-medium text-foreground">Cost Variance</span> = how much actual
+        ingredient usage cost differed from plan.{' '}
+        <span className="font-medium text-foreground">Margin Impact</span> = estimated profit
+        lost to waste and overruns.{' '}
+        <span className="font-medium text-foreground">Efficiency</span> (see below) = 100 minus
+        waste% minus overrun% — higher is better.
+      </p>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -608,6 +622,9 @@ function CostVarianceTab({ costVariance }: { costVariance: ReportsVM['costVarian
             <Gauge className="h-5 w-5 text-primary" />
             Production Efficiency (30 Days)
           </CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Based on recorded waste and ingredient overruns. Higher is better.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {efficiency.hasData ? (

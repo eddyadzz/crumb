@@ -163,9 +163,13 @@ export function ProductsClient({
           </Card>
         ))}
         {filtered.length === 0 && (
-          <p className="col-span-full py-12 text-center text-sm text-muted-foreground">
-            No products found
-          </p>
+          <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center">
+            <p className="text-sm font-semibold">Add a product so there is something to sell</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              Products link your recipes to a selling price — they are what orders,
+              the portal, and sales reports are built on.
+            </p>
+          </div>
         )}
       </div>
 

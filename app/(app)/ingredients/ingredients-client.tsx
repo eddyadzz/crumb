@@ -144,9 +144,28 @@ export function IngredientsClient({
           />
         ))}
         {filtered.length === 0 && (
-          <p className="col-span-full py-12 text-center text-sm text-muted-foreground">
-            No ingredients found
-          </p>
+          <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center">
+            <p className="text-sm font-semibold">Start by adding your first ingredient</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              Ingredients unlock costing, low-stock alerts, and shopping lists.
+              Add them one by one, or paste a whole pantry at once.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                Add an ingredient
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
+                <FileUp className="h-3.5 w-3.5" />
+                Bulk import
+              </Button>
+            </div>
+            {search && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Nothing matches “{search}” — try a different name.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

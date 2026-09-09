@@ -193,6 +193,7 @@ export async function seedSampleBakery(): Promise<{ ok: true } | { error: string
     title: 'Sample bakery loaded',
     description: 'Chocolate Cake with one completed batch, orders, and sales',
   });
+  await prisma.tenant.update({ where: { id: tenantId }, data: { isSample: true } });
 
   revalidatePath('/');
   revalidatePath('/recipes');
@@ -203,4 +204,29 @@ export async function seedSampleBakery(): Promise<{ ok: true } | { error: string
   revalidatePath('/reports');
   revalidatePath('/customers');
   return { ok: true };
+}
+
+/** Wipe all data in a sample business and reload a fresh sample bakery. */
+export async function resetSampleData(): Promise<{ ok: true } | { error: string }> {
+  const { tenantId } = await requireRole('OWNER');
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { isSample: true },
+  });
+  if (!tenant?.isSample) {
+    return { error: 'Reset is only available for the sample bakery' };
+  }
+
+  // All tables are tenant-scoped; explicit ordering keeps intent clear.
+  await prisma.sale.deleteMany({ where: { tenantId } });
+  await prisma.customerOrder.deleteMany({ where: { tenantId } });
+  await prisma.customer.deleteMany({ where: { tenantId } });
+  await prisma.product.deleteMany({ where: { tenantId } });
+  await prisma.productionOrder.deleteMany({ where: { tenantId } });
+  await prisma.ingredient.deleteMany({ where: { tenantId } });
+  await prisma.notification.deleteMany({ where: { tenantId } });
+  await prisma.activityEvent.deleteMany({ where: { tenantId } });
+
+  return seedSampleBakery();
 }

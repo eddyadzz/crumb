@@ -32,6 +32,7 @@ export type TenantContext = {
     slug: string;
     status: string;
     orderPortalEnabled: boolean;
+    isSample: boolean;
     plan: {
       code: string;
       name: string;
@@ -68,6 +69,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
           slug: true,
           status: true,
           orderPortalEnabled: true,
+          isSample: true,
           subscription: {
             select: {
               status: true,
@@ -105,6 +107,7 @@ async function resolveTenantContext(): Promise<TenantContext | null> {
       slug: tenant.slug,
       status: tenant.status,
       orderPortalEnabled: tenant.orderPortalEnabled,
+      isSample: tenant.isSample,
       plan: plan
         ? { code: plan.code, name: plan.name, features: resolvePlanFeatures(plan) }
         : null,

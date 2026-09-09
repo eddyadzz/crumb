@@ -174,6 +174,12 @@ export function AppShell({
               <NotificationsBell />
             </div>
           </div>
+          <a
+            href="/settings"
+            className="mt-2 block text-[11px] text-muted-foreground underline underline-offset-2"
+          >
+            Something confusing? Send feedback
+          </a>
         </div>
       </aside>
 
@@ -240,6 +246,11 @@ export function AppShell({
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   Simple keeps the daily baking loop up front. Advanced shows everything.
                 </p>
+                <div className="mt-3 border-t border-border pt-3 text-xs">
+                  <a href="/settings" className="text-muted-foreground underline underline-offset-2">
+                    Found something confusing? Send feedback
+                  </a>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

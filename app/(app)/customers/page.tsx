@@ -24,10 +24,17 @@ export default async function CustomersPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-            <p className="text-sm font-medium">No customer orders yet</p>
+            <p className="text-sm font-medium">Insights build themselves here</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add a customer to an order and insights will build themselves here.
+              Add a named customer to an order and Crumb starts tracking who buys,
+              who comes back, and who has gone quiet — no extra work.
             </p>
+            <a
+              href="/orders?new=1"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+            >
+              Add your first order
+            </a>
           </CardContent>
         </Card>
       ) : (
