@@ -35,9 +35,10 @@ Copy `.env.example` to `.env` on the server and fill in:
 | `BETTER_AUTH_SECRET` | Generate: `openssl rand -base64 32`. Required for signing sessions. |
 | `BETTER_AUTH_URL` | Public origin, e.g. `https://app.yourdomain.com`. No trailing slash. |
 | `NEXT_PUBLIC_APP_URL` | Same as `BETTER_AUTH_URL` (no trailing slash). Inlined at **build** time into the client bundle — must be set via `--build-arg`/compose `build.args`. |
-| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL` | Sending domain from Mailgun. |
+| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_FROM_EMAIL`, `MAILGUN_FROM_NAME` | Sending domain from Mailgun. |
 | `PLATFORM_ADMIN_EMAILS` | Comma-separated emails allowed into `/admin`. |
 | `CRON_TRIAL_SECRET` | Bearer token for the trial-email cron. Generate: `openssl rand -hex 24`. See "Trial lifecycle cron" below. |
+| `CRON_REMINDERS_SECRET` | Bearer token for the daily morning-briefing cron (`/api/cron/order-reminders`, idempotent per day). |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Default `crumb`/`crumb`/`crumb`; override for prod. |
 | `PORT` / `WEB_PORT` | Container listens on 3000; `WEB_PORT` is the host mapping. |
 
@@ -71,9 +72,20 @@ curl -X POST -H "Authorization: Bearer $CRON_TRIAL_SECRET" \
 ```
 
 The handler is idempotent (persists which milestone it sent per trial), so
-overrunning frequency is safe. Examples: a distro/systemd timer, a separate
-host cron, or an HTTP cron provider (e.g. Cronitor/Cronhub). Protect the token
-and do not expose `CRON_TRIAL_SECRET` in public repos.
+overrunning frequency is safe. A companion endpoint,
+`POST /api/cron/order-reminders` (`CRON_REMINDERS_SECRET`) sends the daily
+morning briefing — next day's confirmed orders, batches to plan, shortages,
+expected revenue — and is idempotent per day. Schedule both from the same
+timer:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_REMINDERS_SECRET" \
+  https://app.yourdomain.com/api/cron/order-reminders
+```
+
+Examples: a distro/systemd timer, a separate host cron, or an HTTP cron
+provider (e.g. Cronitor/Cronhub). Protect the tokens and do not expose
+`CRON*_SECRET` in public repos.
 
 ## HTTPS (recommended)
 
