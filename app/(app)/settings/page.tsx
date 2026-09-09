@@ -18,7 +18,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
-import { submitFeedback } from '@/lib/actions/feedback';
+import { MoodFeedbackCard } from '@/components/mood-feedback';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -781,24 +781,6 @@ function NotifToggle({
 }
 
 function FeedbackCard() {
-  const [message, setMessage] = useState('');
-  const [pending, startTransition] = useTransition();
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSend = () => {
-    setError(null);
-    startTransition(async () => {
-      const res = await submitFeedback(message);
-      if (res.ok) {
-        setSent(true);
-        setMessage('');
-      } else {
-        setError(res.error);
-      }
-    });
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -807,29 +789,11 @@ function FeedbackCard() {
           Feedback
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {sent ? (
-          <p className="text-sm text-success">
-            Thank you — your note reached the BoliFlow team. Keep them coming.
-          </p>
-        ) : (
-          <>
-            <Textarea
-              placeholder="What works, what confuses you, what you still do on paper…"
-              rows={3}
-              maxLength={4000}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">Goes straight to the team building Crumb.</p>
-              <Button size="sm" onClick={handleSend} disabled={pending || message.trim().length < 3}>
-                {pending ? 'Sending…' : 'Send feedback'}
-              </Button>
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </>
-        )}
+      <CardContent>
+        <MoodFeedbackCard context="settings" question="How is Crumb working for you?" />
+        <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+          Goes straight to the team building Crumb — asked about once a day.
+        </p>
       </CardContent>
     </Card>
   );

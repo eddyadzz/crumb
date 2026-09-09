@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useOutboxSync } from '@/components/use-outbox-sync';
+import { MoodFeedbackCard } from '@/components/mood-feedback';
 import {
   getHistorySnapshot,
   subscribeSync,
@@ -184,6 +185,8 @@ export function SyncCenter() {
           </p>
         </CardContent>
       </Card>
+
+      <MoodFeedbackCard context="sync-center" question="How is Crumb working for you?" />
     </div>
   );
 }

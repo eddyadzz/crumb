@@ -16,6 +16,7 @@ import {
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { SetupChecklist } from '@/components/setup-checklist';
+import { MoodFeedbackCard } from '@/components/mood-feedback';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -436,6 +437,8 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <MoodFeedbackCard context="dashboard" question="How was your baking day?" />
     </div>
   );
 }
