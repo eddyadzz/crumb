@@ -13,6 +13,10 @@ export const auth = betterAuth({
       tenantId: { type: 'string' },
     },
   },
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 8,
+  },
   plugins: [
     emailOTP({
       otpLength: 6,
