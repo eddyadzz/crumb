@@ -118,8 +118,6 @@ const navGroups: NavGroup[] = [
 
 const allNav = navGroups.flatMap((g) => g.items);
 
-const byHref = (href: string) => allNav.find((i) => i.href === href)!;
-
 /* Simple mode: the workflow minus audit tools (Activity). */
 const simpleGroups = navGroups.map((g) => ({
   ...g,
