@@ -10,7 +10,7 @@
  * Bump CACHE_VERSION to invalidate every cache after a deploy that changes
  * shell behaviour.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `crumb-static-${CACHE_VERSION}`;
 const SHELL_CACHE = `crumb-shell-${CACHE_VERSION}`;
 const PAGE_CACHE = `crumb-pages-${CACHE_VERSION}`;

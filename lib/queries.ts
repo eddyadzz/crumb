@@ -19,6 +19,7 @@ import {
   computeOrderProfit,
   summarizeShortages,
   type OrderProfitBand,
+  type OrderProfitLine,
 } from '@/lib/order-profit';
 import { actualCostFactor } from '@/lib/pricing';
 import {
@@ -749,6 +750,13 @@ export interface OrderProfitLineVM {
 }
 
 export interface OrderProfitPreviewVM {
+  lines: {
+    productName: string;
+    quantity: number;
+    selling: number;
+    cost: number;
+    profit: number;
+  }[];
   selling: number;
   cost: number;
   profit: number;
@@ -863,6 +871,7 @@ export async function getOrderProfitPreviews(
     const shortages = summarizeShortages(shortageRows, formatBaseQuantity);
 
     result[order.id] = {
+      lines: profit.lines,
       selling: profit.selling,
       cost: profit.cost,
       profit: profit.profit,
