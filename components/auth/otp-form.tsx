@@ -86,14 +86,19 @@ export function OtpForm({ mode }: { mode: Mode }) {
     const method = await lookupSignInMethod(email);
     setLoading(false);
     if (!method.exists) {
-      setError(`No account for ${email}. Create one below.`);
+      if (method.isPlatformAdmin) {
+        setError('Your admin email does not have an account yet. Create one — it will have admin access.');
+      } else {
+        setError(`No account for ${email}. Create one.`);
+      }
       return;
     }
     if (method.hasPassword) {
       setStep('password');
       return;
     }
-    // OTP-era users: email a code (rare — only until they set a password).
+    // Account but no password (OTP-era): email a code, then a one-time
+    // set-password step appears after sign-in.
     if (await sendCode(true)) setStep('otp');
   };
 
@@ -115,8 +120,7 @@ export function OtpForm({ mode }: { mode: Mode }) {
       setPassword('');
       return;
     }
-    if (data?.user?.tenantId) router.push(next ?? '/');
-    else router.push('/onboarding');
+    router.push(next ?? (data?.user?.tenantId ? '/' : '/onboarding'));
     router.refresh();
   };
 
@@ -180,6 +184,7 @@ export function OtpForm({ mode }: { mode: Mode }) {
     }
     setLoading(true);
     setError(null);
+    await authClient.updateUser({ name });
     const { error: pwError } = await authClient.$fetch('/set-password', { method: 'POST', body: { newPassword: password } });
     setLoading(false);
     if (pwError) {
@@ -187,12 +192,15 @@ export function OtpForm({ mode }: { mode: Mode }) {
         "We couldn't save a password — you're signed in by code for now. Try again in Settings or next sign-in.",
       );
       setTimeout(() => {
-        router.push('/onboarding');
+        router.push(next ?? '/onboarding');
         router.refresh();
       }, 2200);
       return;
     }
-    router.push('/onboarding');
+    const method = await lookupSignInMethod(email);
+    router.push(
+      next ?? (method.isPlatformAdmin ? '/admin' : '/onboarding'),
+    );
     router.refresh();
   };
 
@@ -281,7 +289,16 @@ export function OtpForm({ mode }: { mode: Mode }) {
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                 {error}{' '}
                 {!isSignUp && (
-                  <Link href="/sign-up" className="font-medium underline underline-offset-2">
+                  <Link
+                    href={{
+                      pathname: '/sign-up',
+                      query: {
+                        ...(next ? { next } : {}),
+                        ...(/^No account/.test(error) ? { email } : {}),
+                      },
+                    }}
+                    className="font-medium underline underline-offset-2"
+                  >
                     Create an account
                   </Link>
                 )}
