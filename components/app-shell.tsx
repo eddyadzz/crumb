@@ -36,63 +36,109 @@ import { ModeToggle, useUiMode } from '@/components/mode-toggle';
 import { useState } from 'react';
 
 // Bottom bar = the daily loop. Everything else is workflow-ordered in More.
+// Bottom bar = the daily loop. The More sheet + desktop sidebar follow the
+// bakery workflow, grouped so nothing needs explaining.
+const productionNavItem = { href: '/produce', label: 'Production', icon: Factory };
+const floorNavItem: { href: string; label: string; icon: typeof Play; indent?: boolean } = {
+  href: '/floor',
+  label: 'Floor Mode',
+  icon: Play,
+  indent: true,
+};
+
 const mainNav = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/orders', label: 'Orders', icon: ClipboardList },
-  { href: '/produce', label: 'Produce', icon: Factory },
+  productionNavItem,
   { href: '/sell', label: 'Sell', icon: ShoppingCart },
   { href: '/recipes', label: 'Recipes', icon: ChefHat },
 ];
 
-// Ordered by how a bakery works: plan -> buy -> make -> price -> customers -> report.
-const moreNav = [
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/learn', label: 'Quick Tutorials', icon: BookOpen },
-  { href: '/forecast', label: 'Forecast', icon: CalendarRange },
-  { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
-  { href: '/floor', label: 'Floor Mode', icon: Play },
-  { href: '/products', label: 'Products', icon: Package },
-  { href: '/ingredients', label: 'Ingredients', icon: Carrot },
-  { href: '/pricing', label: 'Pricing', icon: Tag },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
-  { href: '/sync', label: 'Sync Center', icon: RefreshCcw },
-  { href: '/settings', label: 'Settings', icon: Settings },
+/** Desktop sidebar: workflow groups — ops first, setup second, learning last. */
+import type { LucideIcon } from 'lucide-react';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  indent?: boolean;
+}
+interface NavGroup {
+  title: string | null;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  { title: null, items: [{ href: '/', label: 'Home', icon: Home }] },
+  {
+    title: 'Operations',
+    items: [
+      { href: '/orders', label: 'Orders', icon: ClipboardList },
+      { href: '/customers', label: 'Customers', icon: Users },
+      { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+      { href: '/forecast', label: 'Forecast', icon: CalendarRange },
+      { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
+      productionNavItem,
+      floorNavItem,
+      { href: '/sell', label: 'Sell', icon: ShoppingCart },
+    ],
+  },
+  {
+    title: 'Products',
+    items: [
+      { href: '/products', label: 'Products', icon: Package },
+      { href: '/recipes', label: 'Recipes', icon: ChefHat },
+      { href: '/ingredients', label: 'Ingredients', icon: Carrot },
+      { href: '/pricing', label: 'Pricing', icon: Tag },
+    ],
+  },
+  {
+    title: 'Insights',
+    items: [
+      { href: '/reports', label: 'Reports', icon: BarChart3 },
+      { href: '/notifications', label: 'Notifications', icon: Bell },
+      { href: '/activity', label: 'Activity', icon: Activity },
+    ],
+  },
+  {
+    title: 'Tools',
+    items: [
+      { href: '/tools', label: 'Kitchen Tools', icon: Wrench },
+      { href: '/sync', label: 'Sync Center', icon: RefreshCcw },
+    ],
+  },
+  {
+    title: 'Help',
+    items: [
+      { href: '/learn', label: 'Quick Tutorials', icon: BookOpen },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ];
 
-const allNav = [...mainNav, ...moreNav];
+const allNav = navGroups.flatMap((g) => g.items);
 
 const byHref = (href: string) => allNav.find((i) => i.href === href)!;
 
-/** Simple mode keeps the daily baking loop front and centre and hides the
- * power-tool surfaces (Activity, SaaS extras). */
-const simpleMain = [
-  byHref('/'),
-  byHref('/orders'),
-  byHref('/produce'),
-  byHref('/sell'),
-  byHref('/recipes'),
-];
-const simpleMore = [
-  byHref('/learn'),
-  byHref('/schedule'),
-  byHref('/forecast'),
-  byHref('/shopping-list'),
-  byHref('/floor'),
-  byHref('/products'),
-  byHref('/ingredients'),
-  byHref('/pricing'),
-  byHref('/customers'),
-  byHref('/reports'),
-  byHref('/notifications'),
-  byHref('/tools'),
-  byHref('/sync'),
-  byHref('/settings'),
-];
+/* Simple mode: the workflow minus audit tools (Activity). */
+const simpleGroups = navGroups.map((g) => ({
+  ...g,
+  items: g.items.filter((i) => i.href !== '/activity'),
+}));
 
+/** Mobile More sheet: everything except bottom-bar pages, Quick Tutorials last. */
+const BOTTOM_HREFS = new Set(['/', '/orders', '/produce', '/sell', '/recipes']);
+
+function flatMore(groups: typeof navGroups) {
+  return groups
+    .flatMap((g) => g.items)
+    .filter((i) => !BOTTOM_HREFS.has(i.href));
+}
+
+const moreNav = flatMore(navGroups);
+const simpleMore = flatMore(simpleGroups).filter(
+  (i) => i.href !== '/learn', // returning bakers don't need tutorials; keep Settings last-adjacent
+);
 export type AccountSummary = {
   tenantName: string;
   planName: string;
@@ -110,9 +156,8 @@ export function AppShell({
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const uiMode = useUiMode();
-  const mainItems = uiMode === 'simple' ? simpleMain : mainNav;
+  const groups = uiMode === 'simple' ? simpleGroups : navGroups;
   const moreItems = uiMode === 'simple' ? simpleMore : moreNav;
-  const sidebarItems = [...mainItems, ...moreItems];
 
   const onTrial = account.subscriptionStatus === 'TRIAL';
   const daysLeft = onTrial ? trialDaysLeft(account.trialEndsAt) : null;
@@ -141,26 +186,36 @@ export function AppShell({
             <p className="text-[11px] text-muted-foreground">by BoliFlow</p>
           </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-4">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                )}
-              >
-                <Icon className="h-4.5 w-4.5 shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-4">
+          {groups.map((group) => (
+            <div key={group.title ?? 'home'}>
+              {group.title && (
+                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  {group.title}
+                </p>
+              )}
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      item.indent && 'pl-7',
+                      active
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         <div className="border-t border-border p-4">
           <div className="flex items-center justify-between gap-2">
@@ -280,7 +335,7 @@ export function AppShell({
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch border-t border-border bg-card/95 backdrop-blur-lg lg:hidden">
-          {mainItems.map((item) => {
+          {mainNav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (

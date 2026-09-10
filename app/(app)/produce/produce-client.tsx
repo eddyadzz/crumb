@@ -237,7 +237,7 @@ export function ProduceClient({
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Production Floor"
+        title="Production"
         description="Touch-first queue for daily kitchen runs"
         action={
           <div className="flex items-center gap-2">
