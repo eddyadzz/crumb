@@ -120,7 +120,16 @@ export async function adminGetBilling() {
       monthlyPrice: Number(p.monthlyPrice),
       yearlyPrice: Number(p.yearlyPrice),
     })),
-    subscriptions,
+    // Decimal (monthlyPrice/yearlyPrice on the plan) is not serializable
+    // across the RSC boundary into Client Components.
+    subscriptions: subscriptions.map((s) => ({
+      ...s,
+      plan: {
+        ...s.plan,
+        monthlyPrice: Number(s.plan.monthlyPrice),
+        yearlyPrice: Number(s.plan.yearlyPrice),
+      },
+    })),
   };
 }
 
@@ -348,7 +357,15 @@ export async function adminSetPlan(input: {
   }
 
   revalidatePath('/admin');
-  return updated;
+  // Decimal is not serializable across the RSC boundary.
+  return {
+    ...updated,
+    plan: {
+      ...updated.plan,
+      monthlyPrice: Number(updated.plan.monthlyPrice),
+      yearlyPrice: Number(updated.plan.yearlyPrice),
+    },
+  };
 }
 
 export async function adminExtendTrial(input: { tenantId: string; days: number }) {

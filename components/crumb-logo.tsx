@@ -1,4 +1,3 @@
-
 import { cn } from '@/lib/utils';
 
 /**
@@ -8,9 +7,6 @@ import { cn } from '@/lib/utils';
 export function CrumbLogo({ className }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- brand asset; images are unoptimized (next.config)
-    <img      src="/crumb-logo-256.png"
-      alt="Crumb"
-      className={cn('object-contain', className)}
-    />
+    <img src="/crumb-logo-256.png" alt="Crumb" className={cn('object-contain', className)} />
   );
 }
