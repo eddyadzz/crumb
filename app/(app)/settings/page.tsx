@@ -389,9 +389,12 @@ export default function SettingsPage() {
                   return (
                     <>
                       {selected?.details && (
-                        <p className="rounded-lg bg-muted/50 p-2 text-xs text-muted-foreground">
-                          {selected.name}: pay to {selected.details}
-                        </p>
+                        <div className="rounded-lg border border-border/60 bg-primary/5 p-3 text-sm">
+                          <p className="font-medium text-foreground">Pay to {selected.name}</p>
+                          <p className="mt-0.5 whitespace-pre-line text-xs text-muted-foreground">
+                            {selected.details}
+                          </p>
+                        </div>
                       )}
                       <div>
                         <Label htmlFor="reference-number">{ref.label}</Label>

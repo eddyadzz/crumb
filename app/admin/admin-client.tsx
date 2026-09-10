@@ -15,6 +15,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { paymentFieldsFor, serializeDetails, paymentFieldsPrefill } from '@/lib/payment-details';
 import { StatCard } from '@/components/stat-card';
 import { cn } from '@/lib/utils';
 import {
@@ -776,38 +777,11 @@ export function AdminClient({
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {paymentMethods.map((m) => (
-                  <div
+                  <PaymentMethodRow
                     key={m.id}
-                    className="flex items-center justify-between rounded-xl border border-border p-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{m.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.code}
-                        {m.currency ? ` · ${m.currency}` : ''}
-                      </p>
-                      {m.details && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {m.details}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={m.active ? 'default' : 'secondary'}>
-                        {m.active ? 'Active' : 'Off'}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          await adminTogglePaymentMethod(m.id);
-                          router.refresh();
-                        }}
-                      >
-                        Toggle
-                      </Button>
-                    </div>
-                  </div>
+                    method={m}
+                    onSaved={() => router.refresh()}
+                  />
                 ))}
               </div>
             </CardContent>
@@ -945,6 +919,90 @@ export function AdminClient({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentMethodRow({
+  method,
+  onSaved,
+}: {
+  method: Awaited<ReturnType<typeof adminListPaymentMethods>>[number];
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const fields = paymentFieldsFor(method.code);
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    paymentFieldsPrefill(method.code, method.details),
+  );
+  const [busy, setBusy] = useState(false);
+
+  const saveRow = () => {
+    setBusy(true);
+    void (async () => {
+      try {
+        await adminSavePaymentMethod({
+          id: method.id,
+          name: method.name,
+          code: method.code,
+          details: fields.length > 0 ? serializeDetails(method.code, values) : method.details,
+          currency: method.currency,
+          active: method.active,
+        });
+        router.refresh();
+        onSaved();
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">{method.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {method.code}
+            {method.currency ? ` · ${method.currency}` : ''}
+          </p>
+          {method.details && !editing && (
+            <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">{method.details}</p>
+          )}
+        </div>
+        <Badge variant={method.active ? 'default' : 'secondary'}>{method.active ? 'Active' : 'Off'}</Badge>
+      </div>
+
+      {editing ? (
+        <div className="mt-3 space-y-2">
+          {fields.map((f) => (
+            <div key={f.key} className="space-y-1">
+              <Label htmlFor={`pmf-${method.id}-${f.key}`}>{f.label}</Label>
+              <Input
+                id={`pmf-${method.id}-${f.key}`}
+                value={values[f.key] ?? ''}
+                onChange={(e) => setValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={saveRow} disabled={busy}>
+              {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        fields.length > 0 && (
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => setEditing(true)}>
+            Update details
+          </Button>
+        )
       )}
     </div>
   );
