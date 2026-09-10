@@ -28,6 +28,10 @@ npm run db:migrate       # or: npx prisma migrate deploy
 npm run db:generate
 npm run db:seed          # optional demo data (destructive)
 npm run dev              # http://localhost:3000
+
+> After changing `prisma/schema.prisma`: `npx prisma migrate deploy` +
+> `npx prisma generate`, then **restart the dev server** — Turbopack caches the
+> generated client, so edits won't apply until restart.
 ```
 
 ## Deployment
