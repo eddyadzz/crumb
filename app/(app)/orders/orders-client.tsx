@@ -42,9 +42,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { formatMVR } from '@/lib/costing';
+import { formatBaseQuantity, formatMVR } from '@/lib/costing';
 import { createOrder, createCustomer, setOrderStatus, buildPlanFromOrders } from '@/lib/actions/orders';
 import { ExportButton } from '@/components/export-button';
+import { cn } from '@/lib/utils';
 import type { OrderStatus } from '@prisma/client';
 
 type OrderVM = {
@@ -83,14 +84,38 @@ const NEXT_ACTION: Record<OrderStatus, { to: OrderStatus; label: string } | null
   CANCELLED: null,
 };
 
+export type OrderProfitPreview = {
+  lines: { productName: string; quantity: number; selling: number; cost: number; profit: number }[];
+  selling: number;
+  cost: number;
+  profit: number;
+  marginPct: number;
+  band: 'healthy' | 'low' | 'very_low' | 'unknown';
+  varianceFactorPct: number | null;
+  shortages: { name: string; need: string; have: string; estimatedCost: number }[];
+  extraPurchaseCost: number;
+};
+
+const BAND_STYLES: Record<
+  'healthy' | 'low' | 'very_low' | 'unknown',
+  { cls: string; label: string }
+> = {
+  healthy: { cls: 'bg-success/15 text-success border-success/30', label: 'Healthy margin' },
+  low: { cls: 'bg-warning/15 text-warning border-warning/30', label: 'Thin margin' },
+  very_low: { cls: 'bg-destructive/15 text-destructive border-destructive/30', label: 'Very low margin' },
+  unknown: { cls: 'bg-muted text-muted-foreground border-border', label: 'Cost unknown' },
+};
+
 export function OrdersClient({
   orders: initialOrders,
   customers: initialCustomers,
   products,
+  profitPreviews,
 }: {
   orders: OrderVM[];
   customers: CustomerVM[];
   products: ProductVM[];
+  profitPreviews: Record<string, OrderProfitPreview>;
 }) {
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
@@ -247,6 +272,94 @@ export function OrdersClient({
                     <span className="text-sm font-semibold">Total</span>
                     <span className="font-display text-lg font-bold">{formatMVR(o.totalAmount)}</span>
                   </div>
+                  {o.status === 'PENDING' && profitPreviews[o.id] && (
+                    <div className="rounded-xl border border-border bg-muted/40 p-3">
+                      {profitPreviews[o.id].shortages.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-2.5">
+                          <p className="text-xs font-semibold text-warning">
+                            Stock needed for this order
+                          </p>
+                          <ul className="mt-1.5 space-y-1">
+                            {profitPreviews[o.id].shortages.map((sh) => (
+                              <li key={sh.name} className="flex items-center justify-between text-xs">
+                                <span>
+                                  {sh.name}: need {sh.need}, have {sh.have}
+                                </span>
+                                <span className="font-semibold">{formatMVR(sh.estimatedCost)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-1.5 text-xs text-warning">
+                            Est. extra purchase: {formatMVR(profitPreviews[o.id].extraPurchaseCost)}
+                          </p>
+                        </div>
+                      )}
+                      <p className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Worth taking?
+                        <span
+                          className={cn(
+                            'rounded-full border px-2 py-0.5 text-[11px] normal-case tracking-normal',
+                            BAND_STYLES[profitPreviews[o.id].band].cls,
+                          )}
+                        >
+                          {BAND_STYLES[profitPreviews[o.id].band].label}
+                          {profitPreviews[o.id].varianceFactorPct !== null && profitPreviews[o.id].varianceFactorPct !== 0
+                            ? ` · usage ${profitPreviews[o.id].varianceFactorPct! >= 0 ? '+' : ''}${profitPreviews[o.id].varianceFactorPct!.toFixed(0)}%`
+                            : ''}
+                        </span>
+                      </p>
+                      <div className="space-y-1 text-xs">
+                        {profitPreviews[o.id].lines.map((l) => (
+                          <div key={l.productName} className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate">
+                              {l.quantity}× {l.productName}
+                              <span className="ml-1 text-muted-foreground">
+                                sell {formatMVR(l.selling)} · cost {formatMVR(l.cost)}
+                              </span>
+                            </span>
+                            <span
+                              className={cn(
+                                'shrink-0 font-semibold',
+                                l.profit >= 0 ? 'text-success' : 'text-destructive',
+                              )}
+                            >
+                              {formatMVR(l.profit)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-1.5 grid grid-cols-4 items-end gap-1.5 border-t border-border pt-2 text-xs">
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Order value</p>
+                          <p className="font-semibold">{formatMVR(profitPreviews[o.id].selling)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Est. cost</p>
+                          <p className="font-semibold">{formatMVR(profitPreviews[o.id].cost)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Est. profit</p>
+                          <p
+                            className={cn(
+                              'font-semibold',
+                              profitPreviews[o.id].profit >= 0 ? 'text-success' : 'text-destructive',
+                            )}
+                          >
+                            {formatMVR(profitPreviews[o.id].profit)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Margin</p>
+                          <p className="font-semibold">{profitPreviews[o.id].marginPct.toFixed(0)}%</p>
+                        </div>
+                      </div>
+                      {profitPreviews[o.id].band === 'unknown' && (
+                        <p className="mt-1.5 text-[11px] text-muted-foreground">
+                          Cost estimate unknown — the recipe has no ingredients yet.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {next && o.status !== 'CANCELLED' && (
                     <div className="flex gap-2">
                       {o.status === 'CONFIRMED' && (

@@ -1,10 +1,11 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
-import { convertToBase, costPerBaseUnit } from '@/lib/costing';
+import { convertToBase, costPerBaseUnit, formatBaseQuantity } from '@/lib/costing';
 import { pricingSummary, type PricingSummary } from '@/lib/pricing';
 import {
   aggregateBatches,
   forecastRequirements,
+  type ForecastRow,
 } from '@/lib/forecast';
 import {
   buildShoppingList,
@@ -14,6 +15,12 @@ import {
   type ShoppingListTotal,
   type PurchasePack,
 } from '@/lib/shopping-list';
+import {
+  computeOrderProfit,
+  summarizeShortages,
+  type OrderProfitBand,
+} from '@/lib/order-profit';
+import { actualCostFactor } from '@/lib/pricing';
 import {
   customerStats,
   rankCustomers,
@@ -729,6 +736,146 @@ export async function getPricingAssistant(tenantId: string): Promise<RecipePrici
   return rows.sort(
     (a, b) => rank[a.verdict] - rank[b.verdict] || (a.marginAtCurrent ?? 0) - (b.marginAtCurrent ?? 0)
   );
+}
+
+/* ================= PENDING ORDER PROFIT PREVIEW (Phase K) ================= */
+
+export interface OrderProfitLineVM {
+  productName: string;
+  quantity: number;
+  selling: number;
+  cost: number;
+  profit: number;
+}
+
+export interface OrderProfitPreviewVM {
+  selling: number;
+  cost: number;
+  profit: number;
+  marginPct: number;
+  band: OrderProfitBand;
+  /** Historical usage overrun baked into the estimate, e.g. +15%. */
+  varianceFactorPct: number | null;
+  shortages: { name: string; need: string; have: string; estimatedCost: number }[];
+  extraPurchaseCost: number;
+}
+
+/**
+ * "Should I accept this order?" for every PENDING order at once:
+ * per-line selling/cost/profit at the recipe's *actual* usage cost
+ * (planned × historical variance factor), plus the stock shortfall and the
+ * estimated extra purchase cost this order would require.
+ */
+export async function getOrderProfitPreviews(
+  tenantId: string,
+): Promise<Record<string, OrderProfitPreviewVM>> {
+  const orders = await prisma.customerOrder.findMany({
+    where: { tenantId, status: 'PENDING' },
+    include: {
+      customer: { select: { name: true } },
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              recipe: {
+                include: {
+                  recipeIngredients: { include: { ingredient: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (orders.length === 0) return {};
+
+  const [recipes, recipeVariance] = await Promise.all([
+    prisma.recipe.findMany({
+      where: { tenantId },
+      include: { recipeIngredients: { include: { ingredient: true } } },
+      orderBy: { name: 'asc' },
+    }),
+    getRecipeVariance(tenantId),
+  ]);
+
+  const varianceByRecipe = new Map(
+    recipeVariance.map((r) => [r.recipeId, r.varianceCostPct]),
+  );
+
+  const forecastRecipes = recipes.map((r) => ({
+    id: r.id,
+    ingredients: r.recipeIngredients.map((ri) => ({
+      quantity: ri.quantity,
+      unit: ri.unit,
+      ingredient: {
+        id: ri.ingredient.id,
+        name: ri.ingredient.name,
+        availableQuantity: ri.ingredient.availableQuantity,
+        baseUnit: ri.ingredient.baseUnit,
+        purchaseQuantity: ri.ingredient.purchaseQuantity,
+        purchaseUnit: ri.ingredient.purchaseUnit,
+        purchaseCost: ri.ingredient.purchaseCost,
+      },
+    })),
+  }));
+
+  const result: Record<string, OrderProfitPreviewVM> = {};
+
+  for (const order of orders) {
+    const profitLines = order.items.map((i) => {
+      const factor = actualCostFactor(varianceByRecipe.get(i.product.recipe.id) ?? null);
+      const planned = recipeCostPerServing(i.product.recipe);
+      return {
+        productName: i.product.name,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        costPerUnit: planned * factor,
+        varianceFactorPct: varianceByRecipe.get(i.product.recipe.id) ?? null,
+      };
+    });
+
+    const profit = computeOrderProfit(
+      profitLines.map(({ productName, quantity, unitPrice, costPerUnit }) => ({
+        productName,
+        quantity,
+        unitPrice,
+        costPerUnit,
+      })),
+    );
+
+    const batches = aggregateBatches(
+      order.items.map((i) => ({
+        quantity: i.quantity,
+        productType: i.product.type,
+        servingsProduced: i.product.recipe.servingsProduced,
+        recipeId: i.product.recipe.id,
+        recipeName: i.product.recipe.name,
+      })),
+    );
+    const shortageRows: (ForecastRow & { recipeId?: string })[] = forecastRequirements(
+      forecastRecipes,
+      batches,
+    );
+    const shortages = summarizeShortages(shortageRows, formatBaseQuantity);
+
+    result[order.id] = {
+      selling: profit.selling,
+      cost: profit.cost,
+      profit: profit.profit,
+      marginPct: profit.marginPct,
+      band: profit.band,
+      varianceFactorPct:
+        profitLines.reduce<number | null>((acc, l) => l.varianceFactorPct ?? null, null),
+      shortages: shortages.items,
+      extraPurchaseCost: shortages.estimatedCost,
+    };
+  }
+
+  return result;
 }
 
 /* ================= SHOPPING LIST (Phase I-F) ================= */
