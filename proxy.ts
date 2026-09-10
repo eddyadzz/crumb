@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
 import { prisma } from '@/lib/prisma';
 
-const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/invite', '/manifest.webmanifest', '/sw.js', '/offline', '/order', '/status', '/welcome'];
+const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/invite', '/manifest.webmanifest', '/sw.js', '/offline', '/order', '/status', '/welcome', '/forgot-password'];
 
 const PORTAL_ROOTS = new Set([
   'ingredients',
@@ -30,6 +30,7 @@ const RESERVED = new Set([
   'order',
   'status',
   'welcome',
+  'forgot-password',
   'sync',
 ]);
 

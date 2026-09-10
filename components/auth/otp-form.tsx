@@ -33,6 +33,7 @@ export function OtpForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get('next'));
+  const passwordJustReset = searchParams.get('reset') === '1';
   const isSignUp = mode === 'sign-up';
 
   const [step, setStep] = useState<Step>('email');
@@ -228,7 +229,9 @@ export function OtpForm({ mode }: { mode: Mode }) {
       title: isSignUp ? 'Create your account' : 'Welcome back',
       sub: isSignUp
         ? 'We verify your email with a one-time code — only at signup'
-        : 'Sign in with your email and password',
+        : passwordJustReset
+          ? 'Password updated — sign in with your new password'
+          : 'Sign in with your email and password',
     },
     otp: {
       title: 'Check your email',
@@ -327,14 +330,12 @@ export function OtpForm({ mode }: { mode: Mode }) {
             </Button>
 
             <div className="flex items-center justify-between text-sm">
-              <button
-                type="button"
-                onClick={() => setStep('email')}
-                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              <Link
+                href="/forgot-password"
+                className="text-muted-foreground hover:text-foreground"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Change email
-              </button>
+                Forgot password?
+              </Link>
               <button
                 type="button"
                 onClick={async () => {
