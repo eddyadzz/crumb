@@ -624,11 +624,17 @@ export interface BetaUsageTenantRow {
   lastActivityAt: string | null;
 }
 
+export interface BetaRouteRow {
+  route: string;
+  events: number;
+}
+
 export interface BetaUsageOverview {
   activeTenants7: number;
   activeTenants30: number;
   totalTenants: number;
   eventRows: BetaUsageEventRow[];
+  routeRows: BetaRouteRow[];
   tenantRows: BetaUsageTenantRow[];
 }
 
@@ -652,7 +658,7 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
   const since7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
   const since30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-  const [byType7, byType30, byTypeAll, tenantGroups7, tenants] = await Promise.all([
+  const [byType7, byType30, byTypeAll, tenantGroups7, tenants, byRoute30] = await Promise.all([
     prisma.usageEvent.groupBy({
       by: ['eventType'],
       where: { createdAt: { gte: since7 } },
@@ -675,6 +681,13 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
     prisma.tenant.findMany({
       select: { id: true, name: true, status: true },
       orderBy: { name: 'asc' },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ['route'],
+      where: { createdAt: { gte: since30 } },
+      _count: { _all: true },
+      orderBy: { _count: { route: 'desc' } },
+      take: 8,
     }),
   ]);
 
@@ -707,11 +720,17 @@ export async function adminGetUsageOverview(): Promise<BetaUsageOverview> {
     }))
     .sort((a, b) => b.events30 - a.events30 || a.tenantName.localeCompare(b.tenantName));
 
+  const routeRows: BetaRouteRow[] = byRoute30
+    .filter((r) => r.route)
+    .map((r) => ({ route: r.route as string, events: r._count._all }))
+    .slice(0, 8);
+
   return {
     activeTenants7: tenantGroups7.length,
     activeTenants30: usage30.length,
     totalTenants: tenants.length,
     eventRows,
+    routeRows,
     tenantRows,
   };
 }

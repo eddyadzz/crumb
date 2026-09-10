@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/tabs';
 import { formatMVR } from '@/lib/costing';
 import { createOrder, createCustomer, setOrderStatus, buildPlanFromOrders } from '@/lib/actions/orders';
+import { ExportButton } from '@/components/export-button';
 import type { OrderStatus } from '@prisma/client';
 
 type OrderVM = {
@@ -137,12 +138,28 @@ export function OrdersClient({
         title="Orders"
         description="Track customer orders and deliveries"
         action={
-          <Button className="gap-2" asChild>
-            <a href="/orders?new=1">
-              <Plus className="h-4 w-4" />
-              New Order
-            </a>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              filename="orders"
+              label="Export"
+              header={['Created', 'Status', 'Customer', 'Items', 'Total MVR', 'Delivery date', 'Delivery time']}
+              rows={orders.map((o) => [
+                o.createdAt.slice(0, 10),
+                STATUS_META[o.status].label,
+                o.customerName ?? 'Walk-in',
+                o.items.map((i) => `${i.quantity}x ${i.productName}`).join('; '),
+                o.totalAmount,
+                o.deliveryDate ? o.deliveryDate.slice(0, 10) : '',
+                o.deliveryTime ?? '',
+              ])}
+            />
+            <Button className="gap-2" asChild>
+              <a href="/orders?new=1">
+                <Plus className="h-4 w-4" />
+                New Order
+              </a>
+            </Button>
+          </div>
         }
       />
 
@@ -324,11 +341,18 @@ function CustomerPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{customers.length} customer{customers.length === 1 ? '' : 's'}</p>
-        <Button variant="outline" size="sm" className="gap-1" onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Customer
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            filename="customers"
+            header={['Name', 'Phone', 'Email', 'Orders', 'Notes']}
+            rows={customers.map((c) => [c.name, c.phone ?? '', c.email ?? '', c.orderCount, c.notes ?? ''])}
+          />
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Customer
+          </Button>
+        </div>
       </div>
       <div className="space-y-2">
         {customers.length === 0 && (

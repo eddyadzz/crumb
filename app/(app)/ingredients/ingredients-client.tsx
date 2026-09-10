@@ -14,6 +14,7 @@ import {
   History,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { ExportButton } from '@/components/export-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,6 +110,11 @@ export function IngredientsClient({
         description="Manage your pantry and track costs"
         action={
           <div className="flex items-center gap-2">
+            <ExportButton
+              filename="ingredients"
+              header={['Name', 'Base unit', 'In stock', 'Pack size', 'Pack unit', 'Pack cost MVR', 'Cost per base', 'Reorder at']}
+              rows={ingredients.map((i) => [i.name, i.baseUnit, i.availableQuantity, i.purchaseQuantity, i.purchaseUnit, i.purchaseCost, i.costPerBaseUnit, i.reorderLevel])}
+            />
             <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={isPending}>
               <FileUp className="h-4 w-4" />
               <span className="hidden sm:inline">Bulk Import</span>

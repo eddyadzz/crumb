@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Package, Search, MoreVertical, TrendingUp, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { ExportButton } from '@/components/export-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,11 +82,18 @@ export function ProductsClient({
         title="Products"
         description="Manage your sellable products and stock"
         action={
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Product</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              filename="products"
+              header={['Name', 'Price MVR', 'In stock']}
+              rows={initial.map((p) => [p.name, p.sellingPrice, p.availableQuantity])}
+            />
+            <Button className="gap-2" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Product</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
         }
       />
 

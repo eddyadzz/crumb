@@ -1,4 +1,11 @@
 import { adminGetUsageOverview, adminListFeedback } from '@/lib/actions/admin';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const MOOD_ROWS = [
+  { emoji: '🙂', label: 'Easy' },
+  { emoji: '😐', label: 'Confusing' },
+  { emoji: '☹', label: 'Frustrating' },
+] as const;
 import { MessageSquare } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -84,6 +91,59 @@ export default async function BetaUsagePage() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Most visited pages (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {overview.routeRows.map((r) => (
+              <div key={r.route} className="flex items-center justify-between text-sm">
+                <span className="font-mono text-xs">{r.route}</span>
+                <span className="tabular-nums font-semibold">{fmt(r.events)}</span>
+              </div>
+            ))}
+            {overview.routeRows.length === 0 && (
+              <p className="py-2 text-sm text-muted-foreground">No events yet</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Mood breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {MOOD_ROWS.map((m) => {
+              const moodFeedback = feedback.filter((f) => f.message.startsWith(m.emoji));
+              const totalMoods = feedback.filter((f) => MOOD_ROWS.some((k) => f.message.startsWith(k.emoji))).length;
+              const share = totalMoods > 0 ? Math.round((moodFeedback.length / totalMoods) * 100) : 0;
+              return moodFeedback.length > 0 ? (
+                <div key={m.label} className="flex items-center justify-between text-sm">
+                  <span>
+                    {m.emoji} {m.label}
+                  </span>
+                  <span className="tabular-nums font-semibold">
+                    {moodFeedback.length} ({share}%)
+                  </span>
+                </div>
+              ) : null;
+            })}
+            {feedback.length === 0 && (
+              <p className="py-2 text-sm text-muted-foreground">
+                No feedback yet — bakers get a mood prompt on the Dashboard, Sync Center, and Settings.
+              </p>
+            )}
+            <p className="border-t border-border pt-2 text-xs text-muted-foreground">
+              {feedback.filter((f) => !MOOD_ROWS.some((k) => f.message.startsWith(k.emoji))).length} written comment(s) below
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
       <section>

@@ -24,6 +24,7 @@ import {
   Users,
   RefreshCcw,
   Play,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trialDaysLeft } from '@/lib/trial';
@@ -46,6 +47,7 @@ const mainNav = [
 // Ordered by how a bakery works: plan -> buy -> make -> price -> customers -> report.
 const moreNav = [
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/learn', label: 'Quick Tutorials', icon: BookOpen },
   { href: '/forecast', label: 'Forecast', icon: CalendarRange },
   { href: '/shopping-list', label: 'Shopping List', icon: ListChecks },
   { href: '/floor', label: 'Floor Mode', icon: Play },
@@ -75,6 +77,7 @@ const simpleMain = [
   byHref('/recipes'),
 ];
 const simpleMore = [
+  byHref('/learn'),
   byHref('/schedule'),
   byHref('/forecast'),
   byHref('/shopping-list'),
