@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { CrumbLogo } from '@/components/crumb-logo';
-import { lookupSignInMethod } from '@/lib/actions/auth';
+import { lookupSignInMethod, setPasswordForCurrentUser } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -177,8 +177,9 @@ export function OtpForm({ mode }: { mode: Mode }) {
     setLoading(true);
     setError(null);
     await authClient.updateUser({ name });
-    const { error: pwError } = await authClient.$fetch('/set-password', { method: 'POST', body: { newPassword: password } });
+    const result = await setPasswordForCurrentUser(password);
     setLoading(false);
+    const pwError = result.ok ? null : result.error;
     if (pwError) {
       setError(
         "We couldn't save a password — you're signed in by code for now. Try again in Settings or next sign-in.",
@@ -208,8 +209,9 @@ export function OtpForm({ mode }: { mode: Mode }) {
     }
     setLoading(true);
     setError(null);
-    const { error: pwError } = await authClient.$fetch('/set-password', { method: 'POST', body: { newPassword: password } });
+    const result = await setPasswordForCurrentUser(password);
     setLoading(false);
+    const pwError = result.ok ? null : result.error;
     if (pwError) {
       setError("Couldn't save your password — you can still sign in with a code.");
       setTimeout(() => {

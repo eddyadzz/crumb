@@ -1,6 +1,8 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
 import { isPlatformAdminEmail } from '@/lib/admin';
 
 export interface SignInMethod {
@@ -43,4 +45,24 @@ export async function lookupSignInMethod(email: string): Promise<SignInMethod> {
     hasPassword: user.accounts.some((a) => a.providerId === 'credential'),
     isPlatformAdmin: isPlatformAdminEmail(normalized),
   };
+}
+
+/** Attach a password to the signed-in session's user (OTP-created accounts
+ * have none). Runs server-side because /set-password is createAuthEndpoint
+ * .serverOnly — it deliberately has no HTTP surface, so it must be called via
+ * auth.api with the forwarded request headers for session context. */
+export async function setPasswordForCurrentUser(
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userHeaders = await headers();
+  try {
+    await auth.api.setPassword({
+      body: { newPassword },
+      headers: userHeaders,
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to set a password';
+    return { ok: false, error: message };
+  }
 }
