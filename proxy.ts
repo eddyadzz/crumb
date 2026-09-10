@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
 import { prisma } from '@/lib/prisma';
 
-const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/invite', '/manifest.webmanifest', '/sw.js', '/offline', '/order', '/status'];
+const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/invite', '/manifest.webmanifest', '/sw.js', '/offline', '/order', '/status', '/welcome'];
 
 const PORTAL_ROOTS = new Set([
   'ingredients',
@@ -29,6 +29,7 @@ const RESERVED = new Set([
   'customers',
   'order',
   'status',
+  'welcome',
   'sync',
 ]);
 
@@ -70,7 +71,12 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (!sessionCookie) {
+    // Anonymous visitors to the root get the landing page, not the login.
+    if (pathname === '/' && !sessionCookie) {
+      return NextResponse.redirect(new URL('/welcome', request.nextUrl));
+    }
+
+    if (!sessionCookie) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
     url.searchParams.set('next', pathname);
