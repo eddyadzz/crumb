@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Carrot, Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
+import { CrumbLogo } from '@/components/crumb-logo';
 import { createTenant } from '@/lib/actions/tenant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,9 +43,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <Carrot className="h-6 w-6" />
-          </div>
+          <CrumbLogo className="h-12 w-12" />
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight">
               Set up your business

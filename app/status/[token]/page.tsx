@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { CheckCircle2, Circle, XCircle, Phone, MessageCircle, ChefHat } from 'lucide-react';
+import { CheckCircle2, Circle, XCircle, Phone, MessageCircle } from 'lucide-react';
+import { CrumbLogo } from '@/components/crumb-logo';
 import { prisma } from '@/lib/prisma';
 import { recordUsage } from '@/lib/usage';
 import { UsageEventType } from '@/lib/usage-events';
@@ -46,8 +47,8 @@ export default async function OrderStatusPage({
     <div className="min-h-dvh bg-muted/40">
       <header className="border-b border-border bg-background">
         <div className="mx-auto flex max-w-lg items-center gap-2.5 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <ChefHat className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center">
+            <CrumbLogo className="h-9 w-9" />
           </div>
           <div>
             <p className="font-display text-lg font-bold leading-none tracking-tight">{order.tenant.name}</p>

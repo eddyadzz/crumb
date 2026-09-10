@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { NotificationsBell } from '@/components/notifications-bell';
 import { SyncStatusPill } from '@/components/sync-status-pill';
+import { CrumbLogo } from '@/components/crumb-logo';
 import { ModeToggle, useUiMode } from '@/components/mode-toggle';
 import { useState } from 'react';
 
@@ -173,8 +174,8 @@ export function AppShell({
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-2.5 border-b border-border px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Carrot className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center">
+            <CrumbLogo className="h-9 w-9" />
           </div>
           <div>
             <p className="font-display text-lg font-bold leading-none tracking-tight">
@@ -243,8 +244,8 @@ export function AppShell({
         {/* Mobile top bar */}
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Carrot className="h-4.5 w-4.5" />
+            <div className="flex h-8 w-8 items-center justify-center">
+              <CrumbLogo className="h-8 w-8" />
             </div>
             <span className="font-display text-base font-bold tracking-tight">
               Crumb
@@ -261,8 +262,8 @@ export function AppShell({
             </SheetTrigger>
             <SheetContent side="right" className="flex w-72 flex-col p-0">
               <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                  <Carrot className="h-5 w-5" />
+              <div className="flex h-9 w-9 items-center justify-center">
+                <CrumbLogo className="h-9 w-9" />
                 </div>
                 <div>
                   <p className="font-display text-base font-bold leading-none">
