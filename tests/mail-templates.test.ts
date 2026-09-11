@@ -49,13 +49,27 @@ describe('trial lifecycle emails', () => {
 describe('email templates', () => {
   it('otp emails carry the code and a clear subject', () => {
     const { subject, html, text } = otpEmailContent({ otp: '123456', type: 'sign-in' });
-    expect(subject).toContain('login code');
+    expect(subject).toContain('sign-in code');
     expect(html).toContain('123456');
     expect(text).toContain('123456');
   });
 
   it('verification otps differ by subject', () => {
-    expect(otpEmailContent({ otp: '1', type: 'email-verification' }).subject).toContain('verification');
+    expect(otpEmailContent({ otp: '1', type: 'email-verification' }).subject).toContain('signup');
+  });
+
+  it('password-reset otps have their own subject and expiry copy', () => {
+    const { subject, text, html } = otpEmailContent({ otp: '654321', type: 'forget-password' });
+    expect(subject).toContain('password-reset');
+    expect(text).toContain('654321');
+    expect(text).toContain('only works once');
+    expect(html).toContain('set a new password');
+  });
+
+  it('otp emails carry the Crumb brand mark', () => {
+    const { html } = otpEmailContent({ otp: '123456', type: 'sign-in' });
+    expect(html).toContain('cdn.mvcdn.cc/s3/crumbapp/crmblogo.png');
+    expect(html).toContain('by BoliFlow');
   });
 
   it('welcome emails greet the recipient by name', () => {

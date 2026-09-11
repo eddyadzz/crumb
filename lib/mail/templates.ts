@@ -2,10 +2,12 @@
 
 export type EmailContent = { subject: string; html: string; text: string };
 
-const accent = '#16a34a';
-const surface = '#f0fdf4';
-const border = '#bbf7d0';
+// Brand-aligned: same orange as the app (--primary / themeColor #FF7A1A)
+const accent = '#FF7A1A';
+const surface = '#FFF7ED';
+const border = '#FED7AA';
 const muted = '#78716c';
+const logoUrl = 'https://cdn.mvcdn.cc/s3/crumbapp/crmblogo.png';
 
 function shell(subject: string, intro: string, bodyHtml: string, textLines: string[]): EmailContent {
   const text = textLines.join('\n');
@@ -13,7 +15,12 @@ function shell(subject: string, intro: string, bodyHtml: string, textLines: stri
 <html>
   <body style="margin:0;padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f5f1;color:#1c1917;">
     <div style="max-width:420px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e7e5e4;">
-      <div style="font-size:20px;font-weight:700;letter-spacing:-0.02em;"><span style="color:${accent};">Crumb</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <img src="${logoUrl}" alt="" width="36" height="36" style="border-radius:10px;display:block;" />
+        <span style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">Crumb
+          <span style="font-weight:400;font-size:13px;color:${muted};margin-left:4px;">by BoliFlow</span>
+        </span>
+      </div>
       <p style="margin:24px 0 8px;font-size:16px;">${intro}</p>
       ${bodyHtml}
       <p style="margin:8px 0;font-size:14px;color:${muted};">— Crumb by BoliFlow</p>
@@ -24,7 +31,10 @@ function shell(subject: string, intro: string, bodyHtml: string, textLines: stri
 }
 
 function codeBlock(code: string): string {
-  return `<div style="margin:20px 0;padding:16px;background:${surface};border:1px solid ${border};border-radius:12px;text-align:center;font-size:32px;font-weight:700;letter-spacing:0.3em;color:#166534;">${code}</div>`;
+  return `<div style="margin:20px 0;padding:20px 16px;background:${surface};border:1px solid ${accent};border-radius:12px;text-align:center;">
+    <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${muted};">Your code</p>
+    <p style="margin:6px 0 0;font-size:34px;font-weight:800;letter-spacing:0.35em;color:${accent};font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${code}</p>
+  </div>`;
 }
 
 function copy(text: string): string {
@@ -32,17 +42,22 @@ function copy(text: string): string {
 }
 
 export function otpEmailContent({ otp, type }: { otp: string; type: string }): EmailContent {
-  const verification = type === 'email-verification';
-  const subject = verification ? 'Your Crumb verification code' : 'Your Crumb login code';
-  const intro = verification
-    ? 'Use the code below to verify your email address.'
-    : 'Use the code below to sign in to Crumb.';
+  const purpose =
+    type === 'email-verification'
+      ? { subject: 'Your Crumb signup code', intro: 'Use the code below to finish creating your Crumb account.', kind: 'signup' }
+      : type === 'forget-password'
+        ? { subject: 'Your Crumb password-reset code', intro: 'Use the code below to set a new password.', kind: 'reset' }
+        : { subject: 'Your Crumb sign-in code', intro: 'Use the code below to sign in to Crumb.', kind: 'sign-in' };
+  const tail =
+    purpose.kind === 'reset'
+      ? 'This code expires in 10 minutes and only works once.'
+      : 'This code expires in 10 minutes. If you didn’t request it, you can safely ignore this email.';
   return shell(
-    subject,
-    intro,
+    purpose.subject,
+    purpose.intro,
     codeBlock(otp) +
-      `<p style="margin:8px 0;font-size:14px;color:${muted};">This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.</p>`,
-    [`Use your Crumb ${verification ? 'verification' : 'login'} code: ${otp}`, 'It expires in 10 minutes.']
+      `<p style="margin:8px 0;font-size:14px;color:${muted};">${tail}</p>`,
+    [`Use your Crumb ${purpose.kind === 'reset' ? 'password-reset' : purpose.kind} code: ${otp}`, tail],
   );
 }
 
