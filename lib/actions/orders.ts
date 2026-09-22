@@ -6,6 +6,7 @@ import { requireTenant, requireTenantWritable } from '@/lib/tenant';
 import { orderTotal, canTransition, planFromOrderLines } from '@/lib/orders';
 import { newOrderPublicToken } from '@/lib/public-token';
 import { recordActivity } from '@/lib/activity';
+import { sendOrderInvoice } from '@/lib/actions/invoices';
 import { recordUsage } from '@/lib/usage';
 import { UsageEventType } from '@/lib/usage-events';
 import { fireWebhook } from '@/lib/webhooks';
@@ -197,6 +198,14 @@ export async function setOrderStatus(orderId: string, to: OrderStatus) {
 
   revalidatePath('/orders');
   revalidatePath('/');
+
+  // Auto-send the invoice on delivery — only when the baker has configured
+  // payment details, the customer has an email, and nothing was sent yet.
+  try {
+    await sendOrderInvoice(orderId);
+  } catch {
+    // Never fail the status update because an email bounced.
+  }
   return updated;
 }
 

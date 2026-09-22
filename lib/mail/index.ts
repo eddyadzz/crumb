@@ -10,6 +10,7 @@ import {
   subscriptionApprovedEmailContent,
   subscriptionRejectedEmailContent,
   notificationDigestEmailContent,
+  orderInvoiceEmailContent,
   briefingEmailContent,
   inviteEmailContent,
   type EmailContent,
@@ -253,5 +254,31 @@ export async function sendOrderReminderEmail({
   await sendMail({
     to,
     content: briefingEmailContent({ tenantName, ...briefing }),
+  });
+}
+export async function sendOrderInvoiceEmail({
+  to,
+  tenantName,
+  orderReference,
+  items,
+  totalAmount,
+  paymentDetails,
+}: {
+  to: string;
+  tenantName: string;
+  orderReference: string;
+  items: Array<{ quantity: number; name: string; amount: number }>;
+  totalAmount: number;
+  paymentDetails: string | null;
+}): Promise<void> {
+  await sendMail({
+    to,
+    content: orderInvoiceEmailContent({
+      tenantName,
+      orderReference,
+      items,
+      totalAmount,
+      paymentDetails,
+    }),
   });
 }

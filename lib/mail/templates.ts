@@ -361,3 +361,54 @@ export function briefingEmailContent({
     textLines
   );
 }
+
+export function orderInvoiceEmailContent({
+  tenantName,
+  orderReference,
+  items,
+  totalAmount,
+  paymentDetails,
+}: {
+  tenantName: string;
+  orderReference: string;
+  items: Array<{ quantity: number; name: string; amount: number }>;
+  totalAmount: number;
+  paymentDetails: string | null;
+}): EmailContent {
+  const rows = items
+    .map(
+      (i) =>
+        `<tr><td style="padding:8px 12px;border-top:1px solid ${border};font-size:15px;color:#1c1917;">${i.quantity}× ${i.name}</td><td style="padding:8px 12px;border-top:1px solid ${border};font-size:15px;color:#1c1917;text-align:right;white-space:nowrap;">${Math.round(i.amount)} MVR</td></tr>`,
+    )
+    .join('');
+  const orderTable = `<table style="width:100%;border-collapse:collapse;margin:16px 0;"><tbody>${rows}</tbody></table>`;
+
+  const payToHtml = paymentDetails
+    ? `<p style="font-size:15px;color:#1c1917;margin:16px 0 8px;"><strong>Payment details</strong></p><div style="font-size:14px;color:#1c1917;background:${surface};border:1px solid ${border};border-radius:12px;padding:14px;white-space:pre-line;">${paymentDetails}</div>`
+    : '';
+
+  const payToText = paymentDetails
+    ? ['', 'Payment details:', paymentDetails]
+    : [];
+
+  const subject = `Your invoice from ${tenantName} — ${Math.round(totalAmount)} MVR`;
+  return shell(
+    subject,
+    `Thank you for baking with ${tenantName}. Here is your invoice:`,
+    orderTable +
+      `<p style="font-size:17px;color:#1c1917;margin:16px 0;"><strong>Total: ${Math.round(totalAmount)} MVR</strong></p>` +
+      payToHtml +
+      `<p style="margin:20px 0 0;font-size:15px;color:${muted};">Please transfer the amounts shown when paying by bank. If paying cash on delivery, have MVR ${Math.round(totalAmount)} ready.</p>`,
+    [
+      `Invoice from ${tenantName}:`,
+      '',
+      ...items.map((i) => `- ${i.quantity}x ${i.name}: ${Math.round(i.amount)} MVR`),
+      '',
+      `Total: ${Math.round(totalAmount)} MVR`,
+      '',
+      ...(paymentDetails ? ['Payment details:', paymentDetails] : []),
+      '',
+      `If paying cash on delivery, please have MVR ${Math.round(totalAmount)} ready.`,
+    ],
+  );
+}

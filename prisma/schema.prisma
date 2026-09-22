@@ -147,6 +147,7 @@ model Tenant {
   orderPortalEnabled   Boolean               @default(false)
   /** True when this business is running the demo/sample bakery (banner + reset). */
   isSample             Boolean               @default(false)
+                       invoiceDetails       String?
   users                User[]
   memberships          Membership[]
   invitations          Invitation[]
@@ -440,6 +441,7 @@ model CustomerOrder {
   status       OrderStatus         @default(PENDING)
   /** Unguessable token for the public status page: /status/{publicToken}. */
   publicToken  String?             @unique
+  invoiceSentAt DateTime?            @db.Timestamptz(6)
   deliveryDate DateTime?
   deliveryTime String?
   notes        String?
