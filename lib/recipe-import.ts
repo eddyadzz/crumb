@@ -340,3 +340,116 @@ export function matchIngredientName(
   });
   return candidate ?? null;
 }
+
+/* ================= Recipe-site URL fetch helpers ================= */
+
+/** Untrusted user-provided URL: only http(s), no obvious intranet hosts. */
+export function validateRecipeUrl(raw: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === 'localhost' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    /^(10\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host)
+  ) {
+    return null;
+  }
+  return parsed.toString();
+}
+
+/** Pull recipe JSON-LD blocks out of an HTML document. Pure. */
+export function extractRecipeJsonLd(html: string): unknown[] {
+  const out: unknown[] = [];
+  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      for (const node of arr) {
+        const candidates = Array.isArray(node?.['@graph']) ? node['@graph'] : [node];
+        for (const n of candidates) {
+          const t = n?.['@type'];
+          if (t === 'Recipe' || (Array.isArray(t) && t.includes('Recipe')))
+            out.push(n);
+        }
+      }
+    } catch {
+      // malformed JSON-LD — skip this block
+    }
+  }
+  return out;
+}
+
+export interface FetchedRecipeDraft extends ParsedRecipe {
+  sourceUrl: string;
+}
+
+/** Build a draft recipe from a schema.org Recipe JSON-LD node. Pure. */
+export function parseRecipeJsonLd(node: Record<string, unknown>, sourceUrl: string): ParsedRecipe | null {
+  const name = typeof node['name'] === 'string' ? String(node['name']).trim() : '';
+  if (!name) return null;
+
+  const yieldValue = node['recipeYield'];
+  const yieldRaw =
+    typeof yieldValue === 'string' || typeof yieldValue === 'number'
+      ? String(yieldValue)
+      : Array.isArray(yieldValue)
+        ? String(yieldValue[0] ?? '')
+        : '';
+  const yieldMatch = yieldRaw.match(/\d+(?:[.,]\d+)?/);
+  const yieldCount = yieldMatch !== null ? Number(yieldMatch[0].replace(',', '.')) : null;
+
+  const instructions: string[] = [];
+  const raw = node['recipeInstructions'];
+  const push = (text: string) => {
+    const cleaned = text.replace(/<[^>]+>/g, '').trim();
+    if (cleaned) instructions.push(cleaned);
+  };
+  if (Array.isArray(raw)) {
+    for (const step of raw) {
+      if (typeof step === 'string') push(step);
+      else if (step && typeof step === 'object' && typeof (step as Record<string, unknown>)['text'] === 'string')
+        push(String((step as Record<string, unknown>)['text']));
+    }
+  } else if (typeof raw === 'string') {
+    push(raw);
+  }
+
+  const ingredientTexts: string[] = [];
+  if (Array.isArray(node['recipeIngredient'])) {
+    for (const item of node['recipeIngredient']) {
+      if (typeof item === 'string') push(item);
+      else if (item && typeof item === 'object' && typeof (item as Record<string, unknown>)['text'] === 'string')
+        push(String((item as Record<string, unknown>)['text']));
+    }
+  }
+
+  if (ingredientTexts.length === 0) return null;
+
+  const descriptionText =
+    typeof node['description'] === 'string' ? String(node['description']).trim() : '';
+
+  return {
+    name,
+    yieldCount,
+    ingredients: ingredientLinesFromText(ingredientTexts),
+    instructions: instructions.join('\n') + (descriptionText && instructions.length === 0 ? '\n' + descriptionText : ''),
+  };
+}
+
+function ingredientLinesFromText(texts: string[]): ParsedIngredientLine[] {
+  const out: ParsedIngredientLine[] = [];
+  for (const text of texts) {
+    const line = parseIngredientLine(text);
+    if (line) out.push(line);
+  }
+  return out;
+}
