@@ -393,7 +393,7 @@ export interface FetchedRecipeDraft extends ParsedRecipe {
 }
 
 /** Build a draft recipe from a schema.org Recipe JSON-LD node. Pure. */
-export function parseRecipeJsonLd(node: Record<string, unknown>, sourceUrl: string): ParsedRecipe | null {
+export function parseRecipeJsonLd(node: Record<string, unknown>): ParsedRecipe | null {
   const name = typeof node['name'] === 'string' ? String(node['name']).trim() : '';
   if (!name) return null;
 
