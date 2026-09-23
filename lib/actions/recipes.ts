@@ -7,6 +7,8 @@ import {
   validateRecipeUrl,
   extractRecipeJsonLd,
   parseRecipeJsonLd,
+  matchIngredientName,
+  type MatchableIngredient,
   type ParsedRecipe,
 } from '@/lib/recipe-import';
 import { recordUsage } from '@/lib/usage';
@@ -112,7 +114,7 @@ export async function updateRecipeCosts(input: {
 }
 export interface FetchedRecipeVM {
   name: string | null;
-  yieldCount: number | null;
+  servingsProduced: number | null;
   ingredients: { name: string; quantity: number; unit: string }[];
   instructions: string;
   sourceUrl: string;
@@ -162,5 +164,121 @@ export async function fetchRecipeFromUrl(
     };
   }
 
-  return { ok: true, recipe: { ...draft, sourceUrl: url } };
+  return {
+    ok: true,
+    recipe: {
+      name: draft.name,
+      servingsProduced: draft.yieldCount,
+      ingredients: draft.ingredients,
+      instructions: draft.instructions,
+      sourceUrl: url,
+    },
+  };
+}
+
+export interface DraftInput {
+  name: string;
+  servingsProduced: number;
+  instructions: string;
+  ingredients: { name: string; quantity: number; unit: string }[];
+}
+
+export interface CreateFromDraftResult {
+  recipeId: string;
+  matchedCount: number;
+  createdCount: number;
+}
+
+/**
+ * Create a recipe from a reviewed import draft. Existing tenant ingredients
+ * are matched by fuzzy name; anything new becomes a placeholder ingredient at
+ * zero cost so the baker can fill prices in after.
+ */
+export async function createRecipeFromDraft(
+  draft: DraftInput,
+): Promise<CreateFromDraftResult> {
+  const { tenantId } = await requireTenantWritable();
+
+  const existing = await prisma.ingredient.findMany({
+    where: { tenantId },
+    select: { id: true, name: true },
+  });
+
+  const matchable: MatchableIngredient[] = existing.map((i) => ({
+    id: i.id,
+    name: i.name,
+  }));
+  const plan: { ingredientId: string; quantity: number; unit: string; raw: string }[] = [];
+  const newNames: string[] = [];
+
+  for (const line of draft.ingredients) {
+    const matched = matchIngredientName(line.name, matchable);
+    if (matched) {
+      plan.push({ ingredientId: matched.id, quantity: line.quantity, unit: line.unit, raw: line.name });
+    } else {
+      newNames.push(line.name);
+    }
+  }
+
+  const recipe = await prisma.recipe.create({
+    data: {
+      tenantId,
+      name: draft.name,
+      preparationTime: 0,
+      servingsProduced: draft.servingsProduced > 0 ? draft.servingsProduced : 1,
+      instructions: draft.instructions,
+    },
+  });
+
+  if (newNames.length > 0) {
+    const created = await prisma.ingredient.createMany({
+      data: newNames.map((name) => ({
+        tenantId,
+        name,
+        baseUnit: 'g',
+        purchaseQuantity: 1,
+        purchaseUnit: 'g',
+        purchaseCost: 0,
+        availableQuantity: 0,
+        reorderLevel: 0,
+      })),
+    });
+    const fresh = await prisma.ingredient.findMany({
+      where: { tenantId, name: { in: newNames } },
+      select: { id: true, name: true },
+    });
+    for (const line of draft.ingredients) {
+      const hit = fresh.find((i) => i.name === line.name);
+      if (hit)
+        plan.push({ ingredientId: hit.id, quantity: line.quantity, unit: line.unit, raw: line.name });
+    }
+    void created;
+  }
+
+  if (plan.length > 0) {
+    await prisma.recipeIngredient.createMany({
+      data: plan.map((p) => ({
+        recipeId: recipe.id,
+        ingredientId: p.ingredientId,
+        quantity: p.quantity,
+        unit: p.unit,
+      })),
+    });
+  }
+
+  await recordUsage({
+    tenantId,
+    eventType: UsageEventType.RECIPE_CREATED,
+    route: '/recipes',
+    metadata: { recipeId: recipe.id, imported: true },
+  });
+
+  revalidatePath('/recipes');
+  revalidatePath('/ingredients');
+  revalidatePath('/');
+  return {
+    recipeId: recipe.id,
+    matchedCount: plan.length - newNames.length,
+    createdCount: newNames.length,
+  };
 }

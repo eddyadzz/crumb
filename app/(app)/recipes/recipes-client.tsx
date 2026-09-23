@@ -20,7 +20,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { formatMVR } from '@/lib/costing';
-import { createRecipe } from '@/lib/actions/recipes';
+import { createRecipe, createRecipeFromDraft, fetchRecipeFromUrl } from '@/lib/actions/recipes';
+import { parseRecipeText } from '@/lib/recipe-import';
+import { Globe } from 'lucide-react';
 
 type RecipeVM = {
   id: string;
@@ -41,6 +43,7 @@ export function RecipesClient({ recipes: initial }: { recipes: RecipeVM[] }) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = initial.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
@@ -52,11 +55,18 @@ export function RecipesClient({ recipes: initial }: { recipes: RecipeVM[] }) {
         title="Recipes"
         description="Create and manage your product recipes"
         action={
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New Recipe</span>
-            <span className="sm:hidden">New</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
+              <Globe className="h-4 w-4" />
+              <span className="hidden sm:inline">Import</span>
+              <span className="sr-only sm:hidden">Import</span>
+            </Button>
+            <Button className="gap-2" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Recipe</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </div>
         }
       />
 
@@ -155,6 +165,11 @@ export function RecipesClient({ recipes: initial }: { recipes: RecipeVM[] }) {
         open={addOpen}
         onOpenChange={setAddOpen}
         onCreated={() => router.push('/recipes')}
+      />
+
+      <ImportRecipeDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </div>
   );
@@ -307,6 +322,255 @@ function AddRecipeDialog({
           </Button>
           <Button onClick={handleSave} disabled={pending}>
             {pending ? 'Creating...' : 'Create Recipe'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type DraftVM = {
+  name: string;
+  servingsProduced: number;
+  instructions: string;
+  ingredients: { name: string; quantity: number; unit: string }[];
+};
+
+function ImportRecipeDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [source, setSource] = useState<'paste' | 'url'>('paste');
+  const [url, setUrl] = useState('');
+  const [pasted, setPasted] = useState('');
+  const [draft, setDraft] = useState<DraftVM | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => {
+    setUrl('');
+    setPasted('');
+    setDraft(null);
+    setError(null);
+    setSource('paste');
+  };
+
+  const handleClose = (v: boolean) => {
+    if (!v) reset();
+    onOpenChange(v);
+  };
+
+  const handleExtract = async () => {
+    setError(null);
+    if (source === 'url') {
+      if (!url.trim()) {
+        setError('Paste a recipe link first');
+        return;
+      }
+      setBusy(true);
+      try {
+        const res = await fetchRecipeFromUrl(url.trim());
+        if (res.ok)
+          setDraft({
+            name: res.recipe.name ?? '',
+            servingsProduced: res.recipe.servingsProduced ?? 1,
+            instructions: res.recipe.instructions,
+            ingredients: res.recipe.ingredients,
+          });
+        else setError(res.error);
+      } catch {
+        setError("Couldn't reach that site — try pasting the recipe instead");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (!pasted.trim()) {
+      setError('Paste the recipe text first');
+      return;
+    }
+    const parsed = parseRecipeText(pasted);
+    if (parsed.ingredients.length === 0) {
+      setError(
+        "Couldn't find ingredients. Each line should start with an amount, e.g. \"500g flour\""
+      );
+      return;
+    }
+    setDraft({
+      name: parsed.name ?? '',
+      servingsProduced: parsed.yieldCount ?? 1,
+      instructions: parsed.instructions,
+      ingredients: parsed.ingredients,
+    });
+  };
+
+  const handleSave = () => {
+    if (!draft) return;
+    if (!draft.name.trim()) {
+      setError('Give the recipe a name before saving');
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    void (async () => {
+      try {
+        const res = await createRecipeFromDraft({
+          name: draft.name.trim(),
+          servingsProduced: draft.servingsProduced,
+          instructions: draft.instructions,
+          ingredients: draft.ingredients,
+        });
+        onOpenChange(false);
+        window.location.href = `/recipes/${res.recipeId}`;
+      } catch {
+        setError('Failed to save — please try again');
+        setSaving(false);
+      }
+    })();
+  };
+
+  // Review stage
+  if (draft) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review imported recipe</DialogTitle>
+            <DialogDescription>
+              {draft.ingredients.length} ingredients found. Untick anything you
+              don&apos;t want — you can edit costs afterwards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="importName">Recipe name</Label>
+              <Input
+                id="importName"
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="importServings">Servings</Label>
+              <Input
+                id="importServings"
+                type="number"
+                value={draft.servingsProduced}
+                onChange={(e) =>
+                  setDraft({ ...draft, servingsProduced: e.target.value === '' ? 0 : Number(e.target.value) })
+                }
+              />
+            </div>
+            <div className="rounded-xl border border-border">
+              <ul className="divide-y divide-border">
+                {draft.ingredients.map((ing, idx) => (
+                  <li key={idx} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">{ing.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {ing.quantity} {ing.unit}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          ingredients: draft.ingredients.filter((_, i) => i !== idx),
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+                {draft.ingredients.length === 0 && (
+                  <li className="px-3 py-2 text-sm text-muted-foreground">
+                    No ingredients kept — go back and re-import.
+                  </li>
+                )}
+              </ul>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={saving} onClick={() => setDraft(null)}>
+              Back
+            </Button>
+            <Button disabled={saving || draft.ingredients.length === 0} onClick={handleSave}>
+              {saving ? 'Saving...' : 'Create recipe'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Entry stage
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Import a recipe</DialogTitle>
+          <DialogDescription>
+            Paste a link to a recipe page, or paste the recipe text — Crumb
+            turns it into an editable draft.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-2">
+          <Button
+            variant={source === 'paste' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSource('paste')}
+          >
+            Paste text
+          </Button>
+          <Button
+            variant={source === 'url' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSource('url')}
+          >
+            From website
+          </Button>
+        </div>
+        {source === 'url' ? (
+          <div className="space-y-2">
+            <Label htmlFor="recipeUrl">Recipe link</Label>
+            <Input
+              id="recipeUrl"
+              type="url"
+              placeholder="https://..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleExtract();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="recipePaste">Recipe text</Label>
+            <Textarea
+              id="recipePaste"
+              placeholder={'Chocolate Cookies\n\n500g flour\n2 eggs\n1 cup sugar\n\nMix and bake at 180°C'}
+              className="min-h-[160px]"
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+            />
+          </div>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleClose(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleExtract} disabled={busy}>
+            {busy ? 'Fetching...' : 'Continue'}
           </Button>
         </DialogFooter>
       </DialogContent>
