@@ -51,6 +51,8 @@ import { TeamCard } from './team-card';
 import { ApiKeysCard } from './api-keys-card';
 import { WebhooksCard } from './webhooks-card';
 import { PortalCard } from './portal-card';
+import { InvoiceCard as InvoiceDetailsCard } from './invoice-card';
+import { getInvoiceDetails } from '@/lib/actions/invoices';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -73,20 +75,23 @@ export default function SettingsPage() {
   const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
   const [stockPolicy, setStockPolicyState] = useState<'WARN' | 'BLOCK' | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  // undefined = still loading, null/'' = loaded (may be empty)
+  const [invoiceDetails, setInvoiceDetailsState] = useState<string | null | undefined>(undefined);
 
   const refreshRequests = () =>
     getMyRequests().then(setRequests).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods(), getStockPolicy(), getNotificationPrefs()])
-      .then(([info, planList, methods, policy, prefs]) => {
+    Promise.all([getAccountInfo(), listPlans(), listPaymentMethods(), getStockPolicy(), getNotificationPrefs(), getInvoiceDetails()])
+      .then(([info, planList, methods, policy, prefs, inv]) => {
         if (cancelled) return;
         setAccount(info);
         setPlans(planList);
         setPaymentMethods(methods);
         setStockPolicyState(policy);
         setNotifPrefs(prefs);
+        setInvoiceDetailsState(inv);
       })
       .catch(() => {});
     refreshRequests();
@@ -226,7 +231,10 @@ export default function SettingsPage() {
       {account && canManageApiKeys && <ApiKeysCard canManage />}
 
       {canManageSettings && account && (
-        <PortalCard enabled={account.orderPortalEnabled} slug={account.slug} />
+        <>
+          <PortalCard enabled={account.orderPortalEnabled} slug={account.slug} />
+          {invoiceDetails !== undefined && <InvoiceDetailsCard details={invoiceDetails} />}
+        </>
       )}
       {canManageSettings && <WebhooksCard />}
 
