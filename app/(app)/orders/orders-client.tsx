@@ -13,6 +13,8 @@ import {
   Factory,
   Share2,
   Check,
+  Mail,
+  MailCheck,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,8 +44,9 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { formatBaseQuantity, formatMVR } from '@/lib/costing';
+import { formatMVR } from '@/lib/costing';
 import { createOrder, createCustomer, setOrderStatus, buildPlanFromOrders } from '@/lib/actions/orders';
+import { sendOrderInvoice } from '@/lib/actions/invoices';
 import { ExportButton } from '@/components/export-button';
 import { cn } from '@/lib/utils';
 import type { OrderStatus } from '@prisma/client';
@@ -52,6 +55,8 @@ type OrderVM = {
   id: string;
   status: OrderStatus;
   customerName: string | null;
+  hasCustomerEmail: boolean;
+  invoiced: boolean;
   totalAmount: number;
   publicToken: string | null;
   deliveryDate: string | null;
@@ -122,6 +127,7 @@ export function OrdersClient({
   const [customers, setCustomers] = useState(initialCustomers);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [invoiceState, setInvoiceState] = useState<Record<string, { ok: boolean; msg: string } | null>>({});
 
   const copyStatusLink = async (token: string) => {
     const url = `${window.location.origin}/status/${token}`;
@@ -142,8 +148,34 @@ export function OrdersClient({
   const advanceStatus = async (id: string, to: OrderStatus) => {
     setBusyId(id);
     await setOrderStatus(id, to);
+    if (to === 'DELIVERED') {
+      // Delivery triggers the invoice auto-send server-side.
+      setOrders((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, status: to, invoiced: true } : o)),
+      );
+    }
     setBusyId(null);
     router.refresh();
+  };
+
+  const sendInvoice = async (id: string) => {
+    setBusyId(id);
+    try {
+      const res = await sendOrderInvoice(id);
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, invoiced: true } : o)),
+        );
+        setInvoiceState((prev) => ({ ...prev, [id]: { ok: true, msg: 'Invoice emailed' } }));
+      } else {
+        setInvoiceState((prev) => ({ ...prev, [id]: { ok: false, msg: res.error ?? 'Failed' } }));
+      }
+    } catch {
+      setInvoiceState((prev) => ({ ...prev, [id]: { ok: false, msg: 'Failed to send' } }));
+    } finally {
+      setBusyId(null);
+      router.refresh();
+    }
   };
 
   const planProduction = async (id: string) => {
@@ -384,6 +416,36 @@ export function OrdersClient({
                         {next.label}
                       </Button>
                     </div>
+                  )}
+                  {o.status !== 'PENDING' && o.status !== 'CANCELLED' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full gap-2 text-muted-foreground"
+                      disabled={busyId === o.id || !o.hasCustomerEmail}
+                      onClick={() => sendInvoice(o.id)}
+                    >
+                      {busyId === o.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : o.invoiced ? (
+                        <MailCheck className="h-4 w-4 text-success" />
+                      ) : (
+                        <Mail className="h-4 w-4" />
+                      )}
+                      {o.invoiced ? 'Re-send invoice' : 'Email invoice'}
+                    </Button>
+                  )}
+                  {!o.hasCustomerEmail && o.status !== 'PENDING' && o.status !== 'CANCELLED' && (
+                    <p className="text-center text-[11px] text-muted-foreground">
+                      Add an email to this customer to send invoices
+                    </p>
+                  )}
+                  {invoiceState[o.id] && (
+                    <p
+                      className={`text-center text-[11px] ${invoiceState[o.id]!.ok ? 'text-success' : 'text-destructive'}`}
+                    >
+                      {invoiceState[o.id]!.msg}
+                    </p>
                   )}
                   {o.publicToken && o.status !== 'CANCELLED' && (
                     <Button

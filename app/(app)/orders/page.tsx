@@ -11,7 +11,7 @@ export default async function OrdersPage() {
     prisma.customerOrder.findMany({
       where: { tenantId },
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { name: true, email: true } },
         items: { include: { product: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
@@ -37,6 +37,8 @@ export default async function OrdersPage() {
         id: o.id,
         status: o.status,
         customerName: o.customer?.name ?? null,
+        hasCustomerEmail: Boolean(o.customer?.email),
+        invoiced: o.invoiceSentAt !== null,
         totalAmount: o.totalAmount,
         publicToken: o.publicToken,
         deliveryDate: o.deliveryDate?.toISOString() ?? null,

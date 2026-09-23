@@ -111,12 +111,15 @@ export async function createOrder(input: CreateOrderInput) {
     },
   });
 
+  const customerRow = input.customerId
+    ? await prisma.customer.findUnique({ where: { id: input.customerId }, select: { name: true, email: true } })
+    : null;
   const vm: OrderRow = {
     id: order.id,
     status: order.status,
-    customerName: (input.customerId
-      ? await prisma.customer.findUnique({ where: { id: input.customerId }, select: { name: true } })
-      : null)?.name ?? null,
+    customerName: customerRow?.name ?? null,
+    hasCustomerEmail: Boolean(customerRow?.email),
+    invoiced: false,
     totalAmount: order.totalAmount,
     publicToken: order.publicToken,
     deliveryDate: order.deliveryDate?.toISOString() ?? null,
@@ -213,6 +216,8 @@ export interface OrderRow {
   id: string;
   status: OrderStatus;
   customerName: string | null;
+  hasCustomerEmail: boolean;
+  invoiced: boolean;
   totalAmount: number;
   publicToken: string | null;
   deliveryDate: string | null;
@@ -226,7 +231,7 @@ export async function listOrders(): Promise<OrderRow[]> {
   await requireTenant();
   const orders = await prisma.customerOrder.findMany({
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, email: true } },
       items: { include: { product: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'desc' },
@@ -236,6 +241,8 @@ export async function listOrders(): Promise<OrderRow[]> {
     id: o.id,
     status: o.status,
     customerName: o.customer?.name ?? null,
+    hasCustomerEmail: Boolean(o.customer?.email),
+    invoiced: o.invoiceSentAt !== null,
     totalAmount: o.totalAmount,
     publicToken: o.publicToken,
     deliveryDate: o.deliveryDate?.toISOString() ?? null,

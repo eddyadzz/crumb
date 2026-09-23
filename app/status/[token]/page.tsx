@@ -25,7 +25,7 @@ export default async function OrderStatusPage({
   const order = await prisma.customerOrder.findUnique({
     where: { publicToken: token },
     include: {
-      tenant: { select: { name: true, phone: true } },
+      tenant: { select: { name: true, phone: true, invoiceDetails: true } },
       customer: { select: { name: true } },
       items: { include: { product: { select: { name: true } } } },
     },
@@ -145,6 +145,21 @@ export default async function OrderStatusPage({
             </p>
           </div>
         </div>
+
+        {order.invoiceSentAt && order.tenant.invoiceDetails?.trim() && (
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              How to pay
+            </p>
+            <p className="whitespace-pre-line text-sm">{order.tenant.invoiceDetails}</p>
+            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+              Invoice emailed{' '}
+              {order.invoiceSentAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {' · '}
+              {order.invoiceSentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          </div>
+        )}
 
         {order.tenant.phone && (
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
